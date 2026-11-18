@@ -1,0 +1,5 @@
+# Copier en tablette.conf (fichier personnel, ignoré par git) pour utiliser la tablette en Wi-Fi.
+# Adresse : Paramètres > Aide > À propos > Copyrights et licences (IP address, celle qui n'est pas 10.11.99.1).
+# SSH en Wi-Fi est désactivé par défaut : en USB, lancer une fois  ssh root@10.11.99.1 rm-ssh-over-wlan on
+# L'USB reste prioritaire quand il est branché.
+wifi=192.168.1.42

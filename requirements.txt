@@ -1,0 +1,11 @@
+# Serveur PC (Python 3.10+). rmc 0.3.0 demande rmscene < 0.7, mais rmscene 0.8 est nécessaire pour lire
+# les couleurs libres (color_rgba) : installer rmc sans ses dépendances (voir docs/INSTALLATION.md).
+rmscene==0.8.0
+Pillow>=10
+pypdf==5.1.0          # export PDF
+cairosvg==2.7.1       # export PDF (annotations en vectoriel)
+packaging
+click
+# rmc==0.3.0   (pip install --no-deps rmc==0.3.0)
+# Outil d'extraction du QML (facultatif) :
+# zstandard

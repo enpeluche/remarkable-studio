@@ -1,0 +1,10 @@
+; Bouton gomme d'origine masqué : la case gomme du bouton « 4 cases » le remplace
+; (un 2e appui sur cette case ouvre le menu des types d'effacement de ce bouton).
+AFFECT /qt/qml/xofm/libs/toolbar/qml/EraserMenu.qml
+    TRAVERSE PenTool
+        LOCATE AFTER ALL
+        INSERT {
+            shouldShow: false
+        }
+    END TRAVERSE
+END AFFECT

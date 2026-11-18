@@ -1,0 +1,56 @@
+; Menu officiel du crayon enrichi (3.30) :
+;  - sous les 3 épaisseurs officielles : curseur d'épaisseur continu
+;  - seconde colonne à droite : couleurs libres (palette /home/root/crayons.json), R/V/B, hexadécimal
+; Le contenu vient de /home/root/xovi/crayons/PenMenu.qml, rechargé à chaque ouverture du menu
+; (modifiable sans redémarrer). Mise en page verticale seulement (barre d'outils en portrait).
+AFFECT /qt/qml/xofm/libs/toolbar/qml/WritingTool.qml
+    TRAVERSE PenTool > Item:foldoutContent
+        ; la zone du menu s'élargit pour la colonne de droite
+        REPLACE implicitWidth WITH {
+            implicitWidth: Toolbar.geometry.container.height > 1000
+                           ? columnSelector.implicitWidth + (crayonsCouleurs.item ? 2 + crayonsCouleurs.width : 0)
+                           : rowSelector.implicitWidth
+        }
+        REPLACE implicitHeight WITH {
+            implicitHeight: Toolbar.geometry.container.height > 1000
+                            ? Math.max(columnSelector.implicitHeight, crayonsCouleurs.item ? crayonsCouleurs.item.implicitHeight : 0)
+                            : rowSelector.implicitHeight
+        }
+        LOCATE AFTER ALL
+        INSERT {
+            Rectangle {
+                id: crayonsSeparateur
+                visible: columnSelector.visible && crayonsCouleurs.item !== null
+                x: columnSelector.implicitWidth
+                width: 2
+                height: parent.height
+                color: "black"
+            }
+            Loader {
+                id: crayonsCouleurs
+                property bool menuOpen: root.foldout ? root.foldout.visible : false
+                visible: columnSelector.visible
+                active: columnSelector.visible
+                x: columnSelector.implicitWidth + 2
+                width: item ? item.implicitWidth : 336
+                height: item ? item.implicitHeight : 0
+                source: "file:///home/root/xovi/crayons/PenMenu.qml?s=c&v=" + (menuOpen ? Date.now() : 0)
+                onLoaded: { item.section = "color"; item.menu = root; }
+            }
+        }
+    END TRAVERSE
+    TRAVERSE PenTool > Item:foldoutContent > ColumnLayout#columnSelector
+        LOCATE AFTER ThicknessGrid
+        INSERT {
+            Loader {
+                id: crayonsEpaisseur
+                property bool menuOpen: root.foldout ? root.foldout.visible : false
+                Layout.fillWidth: true
+                Layout.preferredHeight: item ? item.implicitHeight : 0
+                visible: root.hasWidthOption
+                source: "file:///home/root/xovi/crayons/PenMenu.qml?s=t&v=" + (menuOpen ? Date.now() : 0)
+                onLoaded: { item.section = "thickness"; item.menu = root; }
+            }
+        }
+    END TRAVERSE
+END AFFECT

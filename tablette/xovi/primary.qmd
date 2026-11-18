@@ -1,0 +1,10 @@
+; Bouton du crayon principal masqué : le bouton « 4 cases » (quad.qmd) le remplace.
+; (Le crayon principal existe toujours ; son menu reste accessible via la case active du bouton 4 cases.)
+AFFECT /qt/qml/xofm/libs/toolbar/qml/PrimaryPenMenu.qml
+    TRAVERSE WritingTool
+        LOCATE AFTER ALL
+        INSERT {
+            shouldShow: false
+        }
+    END TRAVERSE
+END AFFECT

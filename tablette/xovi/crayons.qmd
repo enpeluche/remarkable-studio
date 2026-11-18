@@ -1,0 +1,76 @@
+; Crayons personnalisés — accès au crayon actif + panneau chargé depuis /home/root/xovi/crayons/Crayons.qml
+; Signaux via /run/xovi-mb :
+;   >upenGet:                 renvoie l'état du crayon (JSON) dans /run/xovi-mb-out
+;   >upenSet:{"argb":..,"thickness":..,"tool":..}   modifie le crayon (champs facultatifs)
+;   ucrayonsReload:           recharge le panneau (après modification de Crayons.qml)
+AFFECT /qml/device/view/documentview/DocumentView.qml
+    IMPORT net.asivery.XoviMessageBroker 2.0
+    TRAVERSE FocusScope
+        LOCATE AFTER ALL
+        INSERT {
+            QtObject {
+                id: crayonsApi
+                property int version: 0
+                function pen() { return documentViewTools.activePen; }
+                function isWriting() { return !!root.document && documentViewTools.isWritingTool(pen().tool); }
+                function state() {
+                    const p = pen();
+                    return JSON.stringify({ doc: !!root.document, writing: isWriting(), tool: p.tool,
+                                            color: p.color, argb: p.colorCode, thickness: p.thickness });
+                }
+                function apply(s) {
+                    if (!isWriting()) {
+                        return false;
+                    }
+                    const p = pen();
+                    if (s.tool !== undefined && s.tool !== null) {
+                        p.tool = s.tool;
+                    }
+                    if (s.argb !== undefined && s.argb !== null) {
+                        p.color = Line.ArgbCode;
+                        p.colorCode = s.argb;
+                    }
+                    if (s.thickness !== undefined && s.thickness !== null) {
+                        p.thickness = s.thickness;
+                    }
+                    version++;
+                    return true;
+                }
+            }
+
+            XoviMessageBroker {
+                id: crayonsBroker
+                listeningFor: ["penGet", "penSet", "crayonsReload"]
+                function onSignalReceived(sgn, message) {
+                    if (sgn === "crayonsReload") {
+                        crayonsLoader.reloadCount++;
+                        return "ok";
+                    }
+                    if (sgn === "penSet") {
+                        try {
+                            crayonsApi.apply(JSON.parse(message));
+                        } catch (e) {
+                            console.log("[crayons] penSet invalide :", e);
+                        }
+                    }
+                    return crayonsApi.state();
+                }
+            }
+
+            Loader {
+                id: crayonsLoader
+                property int reloadCount: 0
+                anchors.fill: parent
+                z: 900
+                active: root.documentLoaded
+                source: "file:///home/root/xovi/crayons/Crayons.qml?v=" + reloadCount
+                onLoaded: item.api = crayonsApi
+                onStatusChanged: {
+                    if (status === Loader.Error) {
+                        console.log("[crayons] le panneau n'a pas pu être chargé");
+                    }
+                }
+            }
+        }
+    END TRAVERSE
+END AFFECT

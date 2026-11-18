@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- remarkable-studio : étoile à huit branches (contour) et cœur plein, violet du thème -->
+  <g fill="none" stroke="#7451eb" stroke-width="3" stroke-linejoin="round">
+    <path d="M32 3 38 20 54 10 44 26 61 32 44 38 54 54 38 44 32 61 26 44 10 54 20 38 3 32 20 26 10 10 26 20Z"/>
+  </g>
+  <path fill="#7451eb" d="M32 22 35 28 41 26 37 32 41 38 35 36 32 42 29 36 23 38 27 32 23 26 29 28Z"/>
+</svg>

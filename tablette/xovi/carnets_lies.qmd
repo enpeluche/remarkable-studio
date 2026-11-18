@@ -1,0 +1,85 @@
+; Carnets liés — v2
+;  - bouton flottant "↔ <carnet lié>" dans les documents qui ont un lien
+;  - liens lus dans /home/root/carnets-lies.json : {"links": {"<uuid>": {"to": "<uuid>", "name": "<nom>"}}}
+;  - signaux via /run/xovi-mb :
+;      ucarnetsOpen:<uuid>,<page>   ouvre un document (page à partir de 0, -1 = dernière page lue)
+;      ucarnetsReload:              relit le fichier des liens
+AFFECT /qml/device/view/main/MainView.qml
+    IMPORT net.asivery.XoviMessageBroker 2.0
+    TRAVERSE Background
+        LOCATE AFTER ALL
+        INSERT {
+            XoviMessageBroker {
+                id: carnetsBroker
+                listeningFor: ["carnetsOpen", "carnetsReload"]
+                function onSignalReceived(sgn, message) {
+                    if (sgn === "carnetsReload") {
+                        carnetsLies.reload();
+                        return;
+                    }
+                    const parts = String(message).trim().split(",");
+                    const p = parts.length > 1 ? parseInt(parts[1]) : -1;
+                    console.log("[carnets] ouverture", parts[0], p);
+                    root.onOpened({ documentId: parts[0], page: isNaN(p) ? -1 : p });
+                }
+            }
+
+            Item {
+                id: carnetsLies
+                anchors.fill: parent
+                z: 1000
+                property var links: ({})
+                readonly property var currentDoc: (documentView.item && documentView.item.documentLoaded) ? documentView.item.document : null
+                readonly property var link: currentDoc ? links[currentDoc.id] : undefined
+
+                function reload() {
+                    const xhr = new XMLHttpRequest();
+                    xhr.open("GET", "file:///home/root/carnets-lies.json", false);
+                    try {
+                        xhr.send();
+                        links = JSON.parse(xhr.responseText).links || {};
+                        console.log("[carnets] liens chargés :", Object.keys(links).length);
+                    } catch (e) {
+                        console.log("[carnets] lecture des liens impossible :", e);
+                        links = {};
+                    }
+                }
+                Component.onCompleted: reload()
+
+                Rectangle {
+                    id: carnetsButton
+                    visible: !!carnetsLies.link
+                    anchors.right: parent.right
+                    anchors.bottom: parent.bottom
+                    anchors.rightMargin: 28
+                    anchors.bottomMargin: 28
+                    width: Math.min(carnetsLabel.implicitWidth + 56, 520)
+                    height: 76
+                    radius: 38
+                    color: carnetsMouse.pressed ? "black" : "white"
+                    border.color: "black"
+                    border.width: 3
+
+                    Text {
+                        id: carnetsLabel
+                        anchors.centerIn: parent
+                        width: Math.min(implicitWidth, 464)
+                        elide: Text.ElideRight
+                        text: "↔  " + (carnetsLies.link ? carnetsLies.link.name : "")
+                        font.pixelSize: 30
+                        color: carnetsMouse.pressed ? "white" : "black"
+                    }
+                    MouseArea {
+                        id: carnetsMouse
+                        anchors.fill: parent
+                        onClicked: {
+                            const target = carnetsLies.link.to;
+                            console.log("[carnets] bascule vers", target);
+                            root.onOpened({ documentId: target });
+                        }
+                    }
+                }
+            }
+        }
+    END TRAVERSE
+END AFFECT

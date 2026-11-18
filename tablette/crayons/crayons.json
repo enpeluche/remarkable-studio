@@ -1,0 +1,7 @@
+{"palette": [
+ {"name": "Noir", "argb": 4278190080, "thickness": 2, "tool": 17},
+ {"name": "Bleu", "argb": 4283327945, "thickness": 2, "tool": 17},
+ {"name": "Rouge", "argb": 4289936953, "thickness": 2, "tool": 17},
+ {"name": "Vert", "argb": 4281043514, "thickness": 2, "tool": 17},
+ {"name": "Surligneur", "argb": 4294440729, "thickness": 4, "tool": 18}
+]}

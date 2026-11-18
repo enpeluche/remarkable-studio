@@ -1,0 +1,23 @@
+# Données personnelles : JAMAIS dans le dépôt
+pc/xochitl/                 # sauvegarde des documents de la tablette
+pc/carnets-lies.json        # liens entre vos documents
+pc/crayons.json             # copie locale de votre palette
+pc/tablette.conf            # adresse Wi-Fi de votre tablette
+pc/.ssh_config              # généré à partir de tablette.conf
+pc/.cache/                  # pages rendues, formules
+*.rm
+*.metadata
+*.content
+
+# Fichiers de reMarkable (protégés) : ne pas redistribuer
+/xochitl
+**/xochitl-libre
+xochitl-*.bin
+*.bin
+hashtab*
+qml/
+
+# Python
+.venv/
+__pycache__/
+*.pyc

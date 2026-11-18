@@ -1,0 +1,30 @@
+; Bouton « 4 cases » (3 crayons + gomme) à la place du contenu du bouton du crayon secondaire.
+; Contenu : /home/root/xovi/crayons/Quad.qml, rechargé quand /home/root/xovi/crayons/quad.version change.
+AFFECT /qt/qml/xofm/libs/toolbar/qml/SecondaryPenMenu.qml
+    TRAVERSE WritingTool
+        LOCATE AFTER ALL
+        INSERT {
+            iconSource: ""
+            content: Item {
+                id: quadZone
+                anchors.fill: parent
+                property int version: 0
+                Timer {
+                    interval: 2000
+                    repeat: true
+                    running: true
+                    onTriggered: {
+                        const x = new XMLHttpRequest();
+                        x.open("GET", "file:///home/root/xovi/crayons/quad.version", false);
+                        try { x.send(); const v = parseInt(x.responseText) || 0; if (v !== quadZone.version) quadZone.version = v; } catch (e) {}
+                    }
+                }
+                Loader {
+                    anchors.fill: parent
+                    source: "file:///home/root/xovi/crayons/Quad.qml?v=" + quadZone.version
+                    onLoaded: item.tool = root
+                }
+            }
+        }
+    END TRAVERSE
+END AFFECT

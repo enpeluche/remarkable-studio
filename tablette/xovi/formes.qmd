@@ -1,0 +1,55 @@
+; Formes : (1) journalise le contenu de gestureData des formes natives (SnapHandler)
+;          (2) accroche rechargeable à chaud dans DeviceSceneView : /home/root/xovi/crayons/Formes.qml
+;              rechargé quand /home/root/xovi/crayons/formes.version change ; reçoit la vue (controller, etc.)
+AFFECT /qml/device/view/documentview/SnapHandler.qml
+    TRAVERSE ShapesOverlay
+        LOCATE AFTER ALL
+        INSERT {
+            onGestureDataChanged: {
+                try {
+                    const o = {};
+                    for (const k in gestureData) {
+                        const v = gestureData[k];
+                        o[k] = (v !== null && typeof v === "object") ? (String(v) + " {" + Object.keys(v).join(",") + "}") : v;
+                    }
+                    console.log("FORMES gestureData " + JSON.stringify(o));
+                } catch (e) {
+                    console.log("FORMES gestureData erreur " + e);
+                }
+            }
+        }
+    END TRAVERSE
+END AFFECT
+AFFECT /qml/device/view/documentview/DeviceSceneView.qml
+    TRAVERSE FocusScope
+        LOCATE AFTER ALL
+        INSERT {
+            Item {
+                id: formesAccroche
+                property int version: 0
+                Timer {
+                    interval: 1000
+                    repeat: true
+                    running: root.visible
+                    onTriggered: {
+                        const x = new XMLHttpRequest();
+                        x.open("GET", "file:///home/root/xovi/crayons/formes.version", false);
+                        try {
+                            x.send();
+                            const v = parseInt(x.responseText) || 0;
+                            if (v !== formesAccroche.version) {
+                                formesAccroche.version = v;
+                            }
+                        } catch (e) {
+                        }
+                    }
+                }
+                Loader {
+                    id: formesLoader
+                    source: "file:///home/root/xovi/crayons/Formes.qml?v=" + formesAccroche.version
+                    onLoaded: item.view = root
+                }
+            }
+        }
+    END TRAVERSE
+END AFFECT
