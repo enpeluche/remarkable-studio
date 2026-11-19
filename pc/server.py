@@ -45,6 +45,8 @@ import formules
 import screen
 import autosync
 import export_pdf
+import annots
+import autohl
 
 HERE = Path(__file__).resolve().parent
 SCALE = rsvg.SCALE                      # écran (226 dpi) -> points
@@ -221,7 +223,7 @@ HL_COLORS = {3: "#fbf719", 4: "#7cf27c", 5: "#ffb6c8", 6: "#8fa6ff", 7: "#ff8f8a
              9: "#fbf719", 10: "#a1d87d", 11: "#8bd0e5", 12: "#b782cd", 13: "#f7e851"}
 
 
-def render_v6(f, out, bounds):
+def render_v6(f, out, bounds, skip_highlights=False):
     tree = read_tree(f)
     anchors = rsvg.build_anchor_pos(tree.root_text)
     if tree.root_text is not None:
@@ -256,8 +258,12 @@ def render_v6(f, out, bounds):
             if isinstance(child, si.Group):
                 group(child, dx, dy)
             elif isinstance(child, si.Line):
+                if skip_highlights and child.tool.value in (si.Pen.HIGHLIGHTER_1.value, si.Pen.HIGHLIGHTER_2.value):
+                    continue                  # export PDF : devenu une vraie annotation de surlignage
                 stroke_svg(child, out, dx, dy, bounds)
             elif isinstance(child, si.GlyphRange):
+                if skip_highlights:
+                    continue
                 rgba = getattr(child, "color_rgba", None)
                 col = (f"rgb({rgba[0]},{rgba[1]},{rgba[2]})" if rgba
                        else HL_COLORS.get(getattr(child.color, "value", 3), "#fbf719"))
@@ -288,19 +294,40 @@ def render_v5(data: bytes, out, bounds):
             stroke_svg(line, out, 0, 0, bounds)
 
 
-def render_annotations(rm_path: Path, bounds):
+def render_annotations(rm_path: Path, bounds, skip_highlights=False):
     out = io.StringIO()
     if rm_path and rm_path.exists():
         data = rm_path.read_bytes()
         head = data[:43].decode("ascii", "replace")
         try:
             if "version=6" in head:
-                render_v6(io.BytesIO(data), out, bounds)
+                render_v6(io.BytesIO(data), out, bounds, skip_highlights)
             elif "version=5" in head or "version=3" in head:
                 render_v5(data, out, bounds)
         except Exception as e:  # page illisible : on affiche ce qu'on a
             out.write(f"<!-- erreur: {esc(e)} -->")
     return out.getvalue()
+
+
+def _parse_bbox_pages(xml):
+    """Sortie de pdftotext -bbox-layout -> par page : lignes de mots [x, y, w, h, "mot"] en unités de page de la
+    tablette (point PDF x 227/72, x décalé de la demi-largeur : le PDF est centré en x = 0)."""
+    pages = []
+    k = 227 / 72
+    for pm in re.finditer(r'<page width="([\d.]+)" height="([\d.]+)">(.*?)</page>', xml, re.S):
+        x0 = -float(pm.group(1)) * k / 2
+        lines = []
+        for lm in re.finditer(r"<line[^>]*>(.*?)</line>", pm.group(3), re.S):
+            words = []
+            for wm in re.finditer(r'<word xMin="([\d.-]+)" yMin="([\d.-]+)" xMax="([\d.-]+)" yMax="([\d.-]+)">(.*?)</word>',
+                                  lm.group(1), re.S):
+                a, b, c, d = (float(v) for v in wm.groups()[:4])
+                words.append([round(x0 + a * k, 2), round(b * k, 2), round((c - a) * k, 2), round((d - b) * k, 2),
+                              html.unescape(wm.group(5))])
+            if words:
+                lines.append(words)
+        pages.append(lines)
+    return pages
 
 
 class Renderer:
@@ -395,24 +422,27 @@ class Renderer:
             idx = page["redir"] + 1
             r = subprocess.run(["pdftotext", "-f", str(idx), "-l", str(idx), "-bbox-layout", str(pdf), "-"],
                                capture_output=True, timeout=60)
-            lines = []
-            xml = r.stdout.decode("utf-8", "replace")
-            pm = re.search(r'<page width="([\d.]+)" height="([\d.]+)"', xml)
-            if pm:
-                k = 227 / 72
-                x0 = -float(pm.group(1)) * k / 2
-                for lm in re.finditer(r"<line[^>]*>(.*?)</line>", xml, re.S):
-                    words = []
-                    for wm in re.finditer(r'<word xMin="([\d.-]+)" yMin="([\d.-]+)" xMax="([\d.-]+)" yMax="([\d.-]+)">(.*?)</word>',
-                                          lm.group(1), re.S):
-                        a, b, c, d = (float(v) for v in wm.groups()[:4])
-                        words.append([round(x0 + a * k, 2), round(b * k, 2), round((c - a) * k, 2), round((d - b) * k, 2),
-                                      html.unescape(wm.group(5))])
-                    if words:
-                        lines.append(words)
-            dst.write_text(json.dumps(lines, ensure_ascii=False))
+            pages = _parse_bbox_pages(r.stdout.decode("utf-8", "replace"))
+            dst.write_text(json.dumps(pages[0] if pages else [], ensure_ascii=False))
         out["lines"] = json.loads(dst.read_text())
         return out
+
+    def text_lines(self, uid, redir):
+        """Lignes de mots d'une page du PDF (index dans le PDF), extraites pour TOUT le document en une seule
+        passe la première fois (recherche) ; None si indisponible."""
+        dst = self.cache / f"{uid}-p{redir}-text.json"
+        if not dst.exists():
+            pdf = self.lib.root / f"{uid}.pdf"
+            if not pdf.exists():
+                return None
+            with self._lock(f"alltext-{uid}"):
+                if not dst.exists():
+                    r = subprocess.run(["pdftotext", "-bbox-layout", str(pdf), "-"], capture_output=True, timeout=600)
+                    for i, lines in enumerate(_parse_bbox_pages(r.stdout.decode("utf-8", "replace"))):
+                        f = self.cache / f"{uid}-p{i}-text.json"
+                        if not f.exists():
+                            f.write_text(json.dumps(lines, ensure_ascii=False))
+        return json.loads(dst.read_text()) if dst.exists() else None
 
     def thumb(self, uid):
         item = self.lib.snapshot().get(uid)
@@ -466,7 +496,8 @@ class Handler(BaseHTTPRequestHandler):
                 if not item or item["type"] == "folder":
                     return self.send(404, b"not found", "text/plain")
                 try:
-                    data = export_pdf.export(self.lib, uid, only_annotated=q.get("annotees", ["0"])[0] == "1")
+                    data = export_pdf.export(self.lib, uid, only_annotated=q.get("annotees", ["0"])[0] == "1",
+                                            renderer=self.renderer)
                 except Exception as e:
                     return self.json({"ok": False, "error": f"export impossible : {e}"}, 500)
                 name = re.sub(r'[\\/:*?"<>|]+', "_", item["name"]).strip() or "document"
@@ -475,6 +506,22 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, data, "application/pdf",
                                  {"Content-Disposition": f"attachment; filename=\"export.pdf\"; filename*=UTF-8''{fname}",
                                   "Cache-Control": "no-store"})
+            if len(parts) == 3 and parts[:2] == ["api", "notes"] and UUID_RE.match(parts[2]):
+                return self.json({"notes": annots.doc_notes(parts[2])})
+            if parts == ["api", "highlights"]:
+                q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query).get("q", [""])[0]
+                res, pending = annots.search_highlights(self.lib, self.renderer, q)
+                return self.json({"results": res, "pending": pending})   # pending : pages pas encore analysées
+            if len(parts) == 3 and parts[:2] == ["api", "search"] and UUID_RE.match(parts[2]):
+                q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query).get("q", [""])[0]
+                return self.json({"results": annots.search(self.lib, self.renderer, parts[2], q)})
+            if len(parts) == 3 and parts[:2] == ["api", "annotations"] and UUID_RE.match(parts[2]):
+                res = annots.document_annotations(self.lib, self.renderer, parts[2], with_bounds=True)
+                if res is None:
+                    return self.send(404, b"", "text/plain")
+                return self.json({"pages": res})
+            if parts == ["api", "autohl"]:
+                return self.json({"on": self.autohl.enabled, "last": self.autohl.last})
             if parts == ["api", "library", "version"]:
                 return self.json({"v": self.sync.version, **self.sync.last})
             if parts == ["api", "library"]:
@@ -583,6 +630,15 @@ class Handler(BaseHTTPRequestHandler):
             body_raw = self.rfile.read(n)
             body = {} if path == "/api/upload" else json.loads(body_raw or b"{}")
             items = self.lib.snapshot()
+            if path == "/api/notes":
+                doc, key = body.get("doc"), str(body.get("key") or "")
+                if doc not in items or not key or len(str(body.get("note") or "")) > 20000:
+                    return self.json({"ok": False, "error": "requête invalide"}, 400)
+                n = annots.set_note(doc, key, body.get("note"), str(body.get("text") or "")[:2000], body.get("page"))
+                return self.json({"ok": True, "note": n})
+            if path == "/api/autohl":
+                self.autohl.set_enabled(bool(body.get("on")))
+                return self.json({"on": self.autohl.enabled})
             if path == "/api/upload":
                 # Envoi d'un PDF / EPUB vers la tablette par son interface web USB (Paramètres > Stockage) :
                 # la tablette l'importe elle-même, sans redémarrage. USB uniquement.
@@ -749,6 +805,8 @@ def main():
     Handler.screen = screen.ScreenStream(Handler.pen)
     Handler.current = live.CurrentPage(lib, Path(a.data))
     Handler.sync = autosync.AutoSync(lib, Path(a.data))
+    Handler.autohl = autohl.AutoHighlighter(Handler.pen, Handler.current, Handler.renderer)
+    threading.Thread(target=annots.warm_up, args=(lib, Handler.renderer), daemon=True).start()
     srv = ThreadingHTTPServer(("127.0.0.1", a.port), Handler)
     url = f"http://127.0.0.1:{a.port}/"
     print(f"{len(lib.items)} éléments chargés — {url}", flush=True)

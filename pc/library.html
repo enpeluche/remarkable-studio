@@ -123,6 +123,18 @@ main { overflow: auto; padding: 18px 24px 60px; }
 #dropzone div { background: var(--panel); color: var(--ink); padding: 18px 26px; border-radius: 10px; box-shadow: var(--shadow); font-weight: 600; }
 #uptoast { position: fixed; right: 18px; bottom: 18px; z-index: 61; max-width: 380px; background: var(--panel); color: var(--ink);
   border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: 12px 16px; font-size: 13px; }
+
+/* résultats dans les surlignages */
+.hlres { margin: 4px 0 18px; padding: 12px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); }
+.hlres h3 { margin: 0 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--site-violet, #7451eb); }
+.hlrow { display: flex; gap: 10px; align-items: flex-start; padding: 7px 6px; border-radius: 5px; text-decoration: none; color: inherit; }
+.hlrow:hover { background: var(--hover); }
+.hlrow .sw { flex: none; width: 12px; height: 12px; border-radius: 3px; margin-top: 4px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.15); }
+.hlbody { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.hltext { font-size: 13.5px; line-height: 1.4; }
+.hltext mark { background: rgba(255, 214, 0, .55); color: inherit; border-radius: 2px; padding: 0 1px; }
+.hlwhere { font-size: 12px; color: var(--muted); }
+.hlnote { font-size: 12.5px; color: var(--ink); background: rgba(116, 81, 235, .08); border-radius: 4px; padding: 2px 6px; white-space: pre-wrap; }
 </style>
 <link rel="stylesheet" href="/static/theme.css">
 <script src="/static/theme.js"></script>
@@ -397,7 +409,32 @@ function route() {
   renderNav(); renderMain();
 }
 window.addEventListener('hashchange', route);
-let qt; $('#q').addEventListener('input', e => { clearTimeout(qt); qt = setTimeout(() => { state.q = e.target.value.trim(); renderNav(); renderMain(); }, 120); });
+let qt; $('#q').addEventListener('input', e => { clearTimeout(qt); qt = setTimeout(() => { state.q = e.target.value.trim(); renderNav(); renderMain(); renderHl(); }, 120); });
+// recherche dans les surlignages de tous les documents (texte retrouvé sous chaque surlignage)
+let hlSeq = 0;
+async function renderHl() {
+  const q = state.q, seq = ++hlSeq;
+  if (!q || q.length < 3) return;
+  let res = [], pending = 0;
+  try { const r = await (await fetch('/api/highlights?q=' + encodeURIComponent(q))).json(); res = r.results || []; pending = r.pending || 0; } catch (e) { return; }
+  if (seq !== hlSeq || q !== state.q || (!res.length && !pending)) return;
+  const main = $('#main'), box = el('section', { class: 'hlres' });
+  box.append(el('h3', {}, `Dans vos surlignages (${res.length})`));
+  if (pending) box.append(el('div', { class: 'hlwhere' }, `Analyse de la bibliothèque en cours (${pending} pages restantes) : les résultats seront complets dans quelques minutes.`));
+  const nq = q.toLocaleLowerCase('fr').normalize('NFD').replace(/\p{Diacritic}/gu, '');
+  for (const r of res) {
+    const t = el('span', { class: 'hltext' });
+    // mise en évidence du passage cherché dans le texte surligné
+    const norm = r.text.toLocaleLowerCase('fr').normalize('NFD').replace(/\p{Diacritic}/gu, '');
+    const i = norm.indexOf(nq);
+    if (i >= 0 && norm.length === r.text.length) t.append(r.text.slice(0, i), el('mark', {}, r.text.slice(i, i + q.length)), r.text.slice(i + q.length));
+    else t.append(r.text);
+    const row = el('a', { class: 'hlrow', href: `#/d/${r.doc}/${r.page + 1}` },
+      [el('span', { class: 'sw', style: `background:${r.color}` }), el('span', { class: 'hlbody' }, [t, r.note ? el('span', { class: 'hlnote' }, '💬 ' + r.note) : null, el('span', { class: 'hlwhere' }, `${r.name} · p. ${r.page + 1}`)].filter(Boolean))]);
+    box.append(row);
+  }
+  main.prepend(box);
+}
 $('#sort').addEventListener('change', e => { state.sort = e.target.value; save(); renderNav(); renderMain(); });
 document.querySelectorAll('#mode button').forEach(b => b.addEventListener('click', () => { state.mode = b.dataset.m; save(); syncCtl(); renderMain(); }));
 function syncCtl() { $('#sort').value = state.sort; document.querySelectorAll('#mode button').forEach(b => b.classList.toggle('on', b.dataset.m === state.mode)); }

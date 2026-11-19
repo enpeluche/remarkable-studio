@@ -17,6 +17,18 @@
   Le PDF est rendu à la résolution de la tablette, au double quand on zoome.
 - **Zone en direct nette** : sous la zone visible sur la tablette, le PDF net ; par-dessus, seulement ce qui diffère
   du PDF dans l'image de l'écran (encre, couleurs). Un effacement sur la tablette se voit tout de suite.
+- **Recherche** (Ctrl+F ou la loupe) : dans tout le texte du document, sans tenir compte des majuscules ni des
+  accents ; résultats encadrés sur les pages, Entrée / Maj+Entrée pour passer de l'un à l'autre, bouton pour
+  ouvrir la page du résultat sur la tablette.
+- **Annotations** (en-tête) : par page, les surlignages avec leur texte (natifs, au surligneur, ou posés depuis le
+  Studio) et le nombre de traits manuscrits ; un clic y emmène ; « Copier en Markdown » (citations + pages +
+  commentaires).
+- **Commentaires** : outil Voir, **clic sur un passage surligné** : petite fenêtre pour écrire un commentaire
+  (Ctrl+Entrée). Gardés sur le PC (`pc/notes.json`), jamais sur la tablette ; pastille violette sur les passages
+  commentés ; repris dans la recherche de la bibliothèque, le Markdown et l'export PDF.
+- **Surligneur à la taille du texte** (palette Crayon) : pendant que le stylet survole une ligne de texte avec le
+  surligneur, son épaisseur est réglée pour que la bande ait la hauteur de la ligne (serveur du PC allumé ; sur la
+  tablette, désactiver « accrocher au texte »).
 - **PDF** (en-tête) : exporte le document ouvert, annotations comprises (Maj+clic : pages annotées seulement).
 - Raccourcis : `V` voir, `L` libre, `R` règle, `C` cercle, `E` ellipse, `G` grille, `P` polygone, `F` formule,
   `Entrée` placer la formule, `Échap` annuler.
@@ -26,6 +38,9 @@
 - **Synchro automatique** : toutes les 10 s, seuls les fichiers modifiés sur la tablette sont recopiés ; la page
   se met à jour sans perdre la position. Rien n'est jamais effacé de la sauvegarde. (La tablette n'enregistre une
   page qu'en changeant de page : la page en cours arrive un peu plus tard.)
+- **Recherche** : tape un mot (3 lettres ou plus) ; en plus des documents, la section « Dans vos surlignages »
+  liste les passages surlignés (et commentaires) qui le contiennent, dans tous les documents ; un clic ouvre la
+  bonne page. (Au premier lancement, la bibliothèque est analysée en arrière-plan, quelques minutes.)
 - **Envoyer des PDF / EPUB sur la tablette** : bouton « Envoyer », ou glisser-déposer les fichiers sur la page.
   Ils arrivent dans « Mes fichiers », sans redémarrage (USB, avec Paramètres > Stockage > Interface web USB activé).
 - **Export PDF** : bouton « PDF » d'un document ouvert (Maj+clic : pages annotées seulement). Pages sans

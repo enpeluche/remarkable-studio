@@ -1,15 +1,24 @@
-# Données personnelles : JAMAIS dans le dépôt
-pc/xochitl/                 # sauvegarde des documents de la tablette
-pc/carnets-lies.json        # liens entre vos documents
-pc/crayons.json             # copie locale de votre palette
-pc/tablette.conf            # adresse Wi-Fi de votre tablette
-pc/.ssh_config              # généré à partir de tablette.conf
-pc/.cache/                  # pages rendues, formules
+# ---- Données personnelles : JAMAIS dans le dépôt
+# (commentaires toujours sur leur propre ligne : git ne comprend pas les commentaires en fin de ligne)
+# sauvegarde des documents de la tablette
+pc/xochitl/
+# pages rendues, texte extrait, annotations analysées, formules
+pc/.cache/
+.cache/
+# liens entre vos documents, palette, adresse Wi-Fi, configuration SSH générée
+pc/carnets-lies.json
+pc/crayons.json
+pc/tablette.conf
+pc/.ssh_config
+# vos commentaires de surlignages et vos réglages
+pc/notes.json
+pc/reglages.json
 *.rm
 *.metadata
 *.content
+*.tmp
 
-# Fichiers de reMarkable (protégés) : ne pas redistribuer
+# ---- Fichiers de reMarkable (protégés) : ne pas redistribuer
 /xochitl
 **/xochitl-libre
 xochitl-*.bin
@@ -17,7 +26,7 @@ xochitl-*.bin
 hashtab*
 qml/
 
-# Python
+# ---- Python
 .venv/
 __pycache__/
 *.pyc

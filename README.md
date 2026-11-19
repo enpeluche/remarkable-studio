@@ -6,7 +6,8 @@ Des outils pour la **reMarkable 2** : voir et piloter sa tablette depuis le PC, 
   est posé sur le rendu des pages enregistrées (le reste du document reste visible), sans l'interface de la tablette.
   On y règle le crayon, on y place des **formes parfaites** et des **formules LaTeX**, on y dessine, et on
   **surligne / souligne / barre le texte du PDF** à la souris (comme dans Zotero) : de vrais traits apparaissent
-  sur la tablette, même hors de l'écran.
+  sur la tablette, même hors de l'écran. **Recherche** dans le document (Ctrl+F), liste des **surlignages avec leur
+  texte**, **commentaires** sur chaque surlignage (gardés sur le PC), copie en Markdown.
 - **Sur la tablette** (mods xovi) :
   - menu du crayon enrichi : **épaisseur continue**, **couleurs libres** (R/V/B, hexadécimal, palette), **formes** ;
   - **formes parfaites instantanées** : règle, rectangle, cercle, ellipse (inclinable), grille, polygone, repère —
@@ -14,7 +15,10 @@ Des outils pour la **reMarkable 2** : voir et piloter sa tablette depuis le PC, 
   - **bouton « 4 cases »** : 3 crayons enregistrés + la gomme, dans un seul bouton de la barre d'outils ;
   - **carnets liés** : un bouton pour passer d'un document à son carnet de notes associé.
 - **Bibliothèque** (navigateur du PC) : la sauvegarde de la tablette, **synchronisée automatiquement**, pages
-  rendues avec leurs annotations, **export PDF** (annotations en vectoriel, texte du PDF conservé).
+  rendues avec leurs annotations ; **recherche dans les surlignages et commentaires de tous les documents** ;
+  **envoi de PDF / EPUB** sur la tablette (glisser-déposer) ; **export PDF** (encre en vectoriel, texte du PDF
+  conservé, surlignages exportés en vrais surlignages PDF avec leur commentaire : reconnus par Zotero).
+- **Surligneur à la taille du texte** : en survolant une ligne, l'épaisseur du surligneur s'ajuste à la ligne.
 - **USB ou Wi-Fi**, choisi automatiquement (USB prioritaire).
 
 > ⚠️ **Projet non officiel, à vos risques.** Il modifie le comportement du logiciel de la tablette (via
@@ -44,7 +48,8 @@ ssh root@10.11.99.1 /home/root/xovi/start      # active les mods (l'interface re
 | [Découvertes](docs/DECOUVERTES.md) | tout ce qu'on a appris sur xochitl 3.30 (format, écran, formes, couleurs…) |
 | [Architecture](docs/ARCHITECTURE.md) | comment les morceaux communiquent |
 | [Sécurité](docs/SECURITE.md) | risques, ce qui est modifié, comment tout retirer |
-| [Feuille de route](docs/FEUILLE-DE-ROUTE.md) | Wi-Fi, idées |
+| [Feuille de route](docs/FEUILLE-DE-ROUTE.md) | idées, pistes |
+| [Développement](docs/DEVELOPPEMENT.md) | carte du code, API, tests, conventions — pour reprendre le projet |
 
 ## Remerciements
 

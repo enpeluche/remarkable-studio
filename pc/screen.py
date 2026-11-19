@@ -69,6 +69,10 @@ class ScreenStream:
         self.last_use = time.time()
         with self.lock:
             if not self.thread or not self.thread.is_alive():
+                # capture endormie (aucun Studio depuis 15 s) : l'image gardée peut être très ancienne
+                # (page modifiée entre-temps) -> on l'oublie et on attend une capture fraîche
+                self.png = None
+                self.raw = None
                 self.thread = threading.Thread(target=self._run, daemon=True)
                 self.thread.start()
 
@@ -79,7 +83,7 @@ class ScreenStream:
     def wait_frame(self, after, timeout=20):
         self.touch()
         with self.cond:
-            self.cond.wait_for(lambda: self.seq > after, timeout=timeout)
+            self.cond.wait_for(lambda: self.seq > after and self.png is not None, timeout=timeout)
             return self.seq, self.png, self.meta
 
     # -- échanges avec la tablette

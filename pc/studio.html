@@ -58,6 +58,43 @@ header h1 { font-size: 15px; margin: 0; }
 .zoom button { border: 0; background: none; color: var(--ink); cursor: pointer; width: 28px; height: 28px; font: 600 16px/1 InterVariable, system-ui, sans-serif; border-radius: 5px; }
 .zoom button:hover { background: var(--hover); color: var(--site-violet); }
 .zoom #zval { width: 48px; font-size: 12.5px; font-weight: 500; }
+/* recherche */
+#findbar { position: absolute; top: 8px; right: 16px; z-index: 26; display: flex; align-items: center; gap: 4px; padding: 5px 6px 5px 10px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); }
+#findbar .ico { width: 18px; height: 18px; color: var(--muted); }
+#findbar input { width: 240px; border: 0; outline: 0; background: none; color: var(--ink); font: inherit; padding: 4px; }
+#findbar #findn { font-size: 12px; color: var(--muted); min-width: 52px; text-align: right; }
+#findbar button { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: 0; border-radius: 5px;
+  background: none; color: var(--ink); cursor: pointer; font-size: 12px; }
+#findbar button:hover { background: var(--hover); color: var(--site-violet); }
+.docpage .hit { position: absolute; z-index: 5; pointer-events: none; background: rgba(255, 196, 0, .30); outline: 1px solid rgba(220, 150, 0, .7); border-radius: 2px; }
+.docpage .hit.cur { background: rgba(255, 120, 0, .35); outline: 2px solid #ff7a00; }
+.docpage .flash { position: absolute; z-index: 5; pointer-events: none; outline: 3px solid var(--site-violet); border-radius: 3px; animation: flash 1.8s ease-out forwards; }
+@keyframes flash { 0%, 60% { opacity: 1; } 100% { opacity: 0; } }
+/* commentaires des surlignages */
+#noteed { position: fixed; z-index: 55; width: 360px; max-width: calc(100vw - 16px); background: var(--panel); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+#notequote { font-size: 13px; line-height: 1.4; color: var(--muted); border-left: 4px solid #fbf719; padding: 2px 0 2px 8px; max-height: 6.5em; overflow: auto; }
+#notetxt { width: 100%; box-sizing: border-box; resize: vertical; min-height: 70px; border: 1px solid var(--line); border-radius: 5px;
+  padding: 7px 8px; font: 13.5px/1.4 InterVariable, system-ui, sans-serif; background: var(--bg); color: var(--ink); }
+#notetxt:focus { outline: 2px solid var(--site-violet); outline-offset: -1px; }
+#noteed .nedbar { display: flex; gap: 6px; align-items: center; }
+#noteed .nedbar .ctl { padding: 5px 10px; font-size: 12.5px; }
+#noteed .hint { font-size: 11.5px; color: var(--muted); }
+.docpage .nbadge { position: absolute; z-index: 7; width: 22px; height: 22px; margin: -14px 0 0 -4px; padding: 3px; border: 2px solid #fff;
+  border-radius: 50%; background: var(--site-violet); cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,.25); }
+.docpage .nbadge svg { width: 100%; height: 100%; fill: #fff; display: block; }
+.nlist .nnote { display: block; margin-top: 3px; padding: 3px 6px; border-radius: 4px; background: var(--accent-soft, rgba(116,81,235,.08)); color: var(--ink); font-size: 12.5px; white-space: pre-wrap; }
+/* annotations */
+#pNotes { width: 350px; }
+#pNotes .nbar { display: flex; gap: 6px; margin-bottom: 8px; }
+#pNotes .nbar .ctl { padding: 4px 9px; font-size: 12.5px; }
+.nlist { max-height: min(60vh, 560px); overflow: auto; margin: 0 -4px; padding: 0 4px; }
+.nlist h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--site-violet); margin: 10px 0 4px; cursor: pointer; }
+.nlist .ni { display: flex; gap: 8px; align-items: flex-start; padding: 6px; border-radius: 5px; cursor: pointer; font-size: 13px; line-height: 1.35; }
+.nlist .ni:hover { background: var(--hover); }
+.nlist .sw { flex: none; width: 12px; height: 12px; border-radius: 3px; margin-top: 3px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.15); }
+.nlist .ink { color: var(--muted); }
 #selbar { position: fixed; z-index: 50; display: flex; align-items: center; gap: 4px; padding: 5px; background: var(--panel);
   border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); }
 #selbar button { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 0;
@@ -145,6 +182,8 @@ label.chk { display: inline-flex; gap: 6px; align-items: center; font-size: 12.5
   <div class="spacer"></div>
   <span class="status" id="status"></span>
   <div class="hright">
+  <button class="ctl with-ico" id="findbtn" title="Rechercher dans le document (Ctrl+F)"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg></button>
+  <button class="ctl with-ico" data-panel="pNotes" title="Surlignages et notes du document"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18h12v-2H3v2zM3 6v2h18V6H3zm0 7h18v-2H3v2z"/></svg>Annotations</button>
   <button class="ctl with-ico" data-panel="pPen" title="Crayon : outil, couleur, épaisseur"><svg class="ico" viewBox="0 0 24 24"><path d="M7 14c-1.66 0-3 1.34-3 3 0 1.31-1.16 2-2 2 .92 1.22 2.49 2 4 2 2.21 0 4-1.79 4-4 0-1.66-1.34-3-3-3zm13.71-9.37-1.34-1.34a.996.996 0 0 0-1.41 0L9 12.25 11.75 15l8.96-8.96a.996.996 0 0 0 0-1.41z"/></svg>Crayon</button>
   <button class="ctl with-ico" data-panel="pShapes" title="Réglages des formes"><svg class="ico" viewBox="0 0 24 24"><path d="M12 2l-5.5 9h11L12 2zm5.5 11c-2.49 0-4.5 2.01-4.5 4.5S15.01 22 17.5 22s4.5-2.01 4.5-4.5-2.01-4.5-4.5-4.5zM3 21.5h8v-8H3v8z"/></svg>Formes</button>
   <a class="ctl with-ico" id="export" href="#" title="Exporter le document en PDF, annotations comprises (Maj+clic : pages annotées seulement)"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>PDF</a>
@@ -182,6 +221,7 @@ label.chk { display: inline-flex; gap: 6px; align-items: center; font-size: 12.5
     </div>
     <div class="slider"><span>Épaisseur</span><input type="range" id="thick" min="0" max="1000" value="400"><output id="thickOut">2.00</output></div>
     <div class="palette" id="palette"></div>
+    <label class="chk" title="Pendant que le stylet survole une ligne de texte avec le surligneur, son épaisseur s'ajuste à la hauteur de la ligne (serveur du PC allumé)"><input type="checkbox" id="autohl"> Surligneur à la taille du texte</label>
   </section>
 
   <section class="card float" id="pShapes" hidden>
@@ -190,6 +230,31 @@ label.chk { display: inline-flex; gap: 6px; align-items: center; font-size: 12.5
     <div class="slider"><span>Côtés</span><input type="range" id="sides" min="3" max="12" value="6"><output id="sidesOut">6</output></div>
     <div class="hint" style="margin-top:8px">Choisissez une forme dans la barre du haut, puis étirez-la à la souris sur la page ouverte (encadrée).</div>
   </section>
+
+  <section class="card float" id="pNotes" hidden>
+    <h2>Annotations <button class="x" title="Fermer">×</button></h2>
+    <div class="nbar"><button class="ctl" id="nreload">Actualiser</button><button class="ctl" id="ncopy" title="Surlignages au format Markdown (citations avec numéros de page)">Copier en Markdown</button></div>
+    <div id="nlist" class="nlist"><p class="hint">…</p></div>
+  </section>
+
+  <div id="noteed" hidden>
+    <div id="notequote"></div>
+    <textarea id="notetxt" rows="4" placeholder="Votre commentaire… (Ctrl+Entrée pour enregistrer)"></textarea>
+    <div class="nedbar"><span class="hint">Sur le PC uniquement</span><span style="flex:1"></span>
+      <button type="button" class="ctl" id="notedel">Supprimer</button>
+      <button type="button" class="ctl" id="noteclose">Fermer</button>
+      <button type="button" class="ctl primary" id="notesave">Enregistrer</button></div>
+  </div>
+
+  <div id="findbar" hidden>
+    <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+    <input type="search" id="findq" placeholder="Rechercher dans le document…" autocomplete="off">
+    <span id="findn">0/0</span>
+    <button type="button" id="findprev" title="Résultat précédent (Maj+Entrée)">▲</button>
+    <button type="button" id="findnext" title="Résultat suivant (Entrée)">▼</button>
+    <button type="button" id="findtab" title="Ouvrir cette page sur la tablette"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 19H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg></button>
+    <button type="button" id="findx" title="Fermer (Échap)">×</button>
+  </div>
 
   <section class="card float" id="pTex" hidden>
     <h2>Formule <button class="x" title="Fermer">×</button></h2>
@@ -256,7 +321,7 @@ setTool('view');
 
 // ---- palettes flottantes (déplaçables, positions mémorisées)
 const store = (k, v) => { try { if (v === undefined) return JSON.parse(localStorage.getItem(k) || 'null'); localStorage.setItem(k, JSON.stringify(v)); } catch (e) { return null; } };
-const DEF = { pPen: [14, 14], pShapes: [14, 300], pTex: [-344, 14] };
+const DEF = { pPen: [14, 14], pShapes: [14, 300], pTex: [-344, 14], pNotes: [-370, 70] };
 function placePanel(el) {
   const app = $('.app').getBoundingClientRect();
   let [x, y] = store('rm-studio-pos-' + el.id) || DEF[el.id];
@@ -287,7 +352,7 @@ document.querySelectorAll('.float').forEach(el => {
     h.addEventListener('pointermove', move); h.addEventListener('pointerup', up);
   });
 });
-{ const open = store('rm-studio-open') || { pPen: true }; for (const id of ['pPen', 'pShapes', 'pTex']) if (open[id]) togglePanel(id, true); }
+{ const open = store('rm-studio-open') || { pPen: true }; for (const id of ['pPen', 'pShapes', 'pTex', 'pNotes']) if (open[id]) togglePanel(id, true); }
 // choisir un outil de forme ou la formule ouvre la palette correspondante
 var panelFor = { grid: 'pShapes', polygon: 'pShapes', axes: 'pShapes', formula: 'pTex' };
 
@@ -303,7 +368,8 @@ async function refreshDoc(force) {
     for (let i = 0; i < s.pageCount; i++) {
       const d = document.createElement('div'); d.className = 'docpage'; d.dataset.i = i;
       d.innerHTML = `<span class="num">${i + 1}</span><img loading="lazy" width="1404" height="1872" alt="page ${i + 1}" src="/api/page/${s.doc}/${i}?v=${s.ver}&hd=${hdLevel()}">`;
-      d.onclick = async () => { if (tool !== 'view' || !getSelection().isCollapsed) return; status('Ouverture de la page ' + (i + 1) + ' sur la tablette…');
+      d.onclick = async ev => { if (tool !== 'view' || !getSelection().isCollapsed) return;
+        const hl = highlightAt(d, ev); if (hl) return openNote(hl.p, hl.a, ev.clientX, ev.clientY); status('Ouverture de la page ' + (i + 1) + ' sur la tablette…');
         const r = await post('/api/tablet/open', { doc: s.doc, page: i }); status(r.ok ? 'Page ' + (i + 1) + ' ouverte sur la tablette' : 'Échec : ' + r.error); };
       box.append(d);
       textObs.observe(d);
@@ -899,6 +965,219 @@ $('#export').addEventListener('click', e => {
   if (!docState.doc) return status('Aucun document ouvert sur la tablette');
   status('Export PDF en préparation…', 6000);
   location.href = `/api/export/${docState.doc}.pdf` + (e.shiftKey ? '?annotees=1' : '');
+});
+
+// ================================================================ recherche dans le document (Ctrl+F)
+var find = { q: '', results: [], i: -1, t: 0 };
+function pageEl(n) { return $('#docview').querySelector(`.docpage[data-i="${n}"]`); }
+async function ensureText(d) {
+  if (!d._text) await loadText(d, docState.doc, +d.dataset.i, false);
+  return d._text && d._text.bounds ? d._text : null;
+}
+function boxEl(d, cls, r) {
+  const [bx, by, bw, bh] = d._text.bounds, e = document.createElement('div');
+  e.className = cls;
+  e.style.cssText = `left:${(r[0] - bx) / bw * 100}%;top:${(r[1] - by) / bh * 100}%;width:${r[2] / bw * 100}%;height:${r[3] / bh * 100}%`;
+  d.append(e);
+  return e;
+}
+function clearHits() { document.querySelectorAll('.docpage .hit').forEach(e => e.remove()); }
+async function drawHits() {
+  clearHits();
+  const byPage = new Map();
+  find.results.forEach((r, k) => { if (!byPage.has(r.page)) byPage.set(r.page, []); byPage.get(r.page).push(k); });
+  for (const [n, ks] of byPage) {
+    const d = pageEl(n);
+    if (!d || !(await ensureText(d))) continue;
+    for (const k of ks) for (const r of find.results[k].rects) boxEl(d, 'hit' + (k === find.i ? ' cur' : ''), r).dataset.k = k;
+  }
+}
+function scrollToRect(d, r, flash) {
+  const dv = $('#docview'), t = d._text;
+  if (!t) { d.scrollIntoView({ block: 'center' }); return; }
+  const [bx, by, bw, bh] = t.bounds, db = d.getBoundingClientRect(), vb = dv.getBoundingClientRect();
+  dv.scrollTop += db.top - vb.top + (r[1] - by) / bh * db.height - dv.clientHeight / 3;
+  dv.scrollLeft += db.left - vb.left + (r[0] - bx) / bw * db.width - dv.clientWidth / 3;
+  if (flash) { const e = boxEl(d, 'flash', [r[0] - 6, r[1] - 6, r[2] + 12, r[3] + 12]); setTimeout(() => e.remove(), 1900); }
+}
+async function goHit(i) {
+  if (!find.results.length) return;
+  find.i = (i + find.results.length) % find.results.length;
+  $('#findn').textContent = `${find.i + 1}/${find.results.length}`;
+  const r = find.results[find.i], d = pageEl(r.page);
+  if (!d) return;
+  await ensureText(d);
+  document.querySelectorAll('.docpage .hit.cur').forEach(e => e.classList.remove('cur'));
+  d.querySelectorAll(`.hit[data-k="${find.i}"]`).forEach(e => e.classList.add('cur'));
+  scrollToRect(d, r.rects[0]);
+}
+async function runFind() {
+  const q = $('#findq').value.trim();
+  if (q === find.q) return;
+  find.q = q; find.results = []; find.i = -1; clearHits();
+  if (q.length < 2 || !docState.doc) { $('#findn').textContent = '0/0'; return; }
+  $('#findn').textContent = '…';
+  try {
+    const r = await (await fetch(`/api/search/${docState.doc}?q=${encodeURIComponent(q)}`)).json();
+    if (find.q !== q) return;
+    find.results = r.results || [];
+  } catch (e) { find.results = []; }
+  $('#findn').textContent = find.results.length ? `0/${find.results.length}` : 'aucun';
+  // premier résultat à partir de la page affichée
+  const cur = docState.page || 0, k = find.results.findIndex(r => r.page >= cur);
+  await drawHits();
+  if (find.results.length) goHit(k < 0 ? 0 : k);
+}
+function openFind() { $('#findbar').hidden = false; $('#findq').focus(); $('#findq').select(); }
+function closeFind() { $('#findbar').hidden = true; clearHits(); find = { q: '', results: [], i: -1 }; $('#findn').textContent = '0/0'; }
+$('#findbtn').onclick = () => $('#findbar').hidden ? openFind() : closeFind();
+$('#findq').addEventListener('input', () => { clearTimeout(find.t); find.t = setTimeout(runFind, 300); });
+$('#findq').addEventListener('keydown', async e => {
+  if (e.key === 'Enter') { e.preventDefault(); clearTimeout(find.t); if ($('#findq').value.trim() !== find.q) await runFind(); else goHit(find.i + (e.shiftKey ? -1 : 1)); }
+  if (e.key === 'Escape') { e.preventDefault(); closeFind(); }
+});
+$('#findnext').onclick = () => goHit(find.i + 1);
+$('#findprev').onclick = () => goHit(find.i - 1);
+$('#findx').onclick = closeFind;
+$('#findtab').onclick = async () => {
+  const r = find.results[find.i];
+  if (!r) return;
+  status('Ouverture de la page ' + (r.page + 1) + ' sur la tablette…');
+  const x = await post('/api/tablet/open', { doc: docState.doc, page: r.page });
+  status(x.ok ? 'Page ' + (r.page + 1) + ' ouverte sur la tablette' : 'Échec : ' + x.error);
+};
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') { e.preventDefault(); openFind(); }
+}, true);
+
+// ================================================================ annotations (surlignages, notes)
+// Surlignages lus dans les pages de la tablette ; commentaires ajoutés ici, stockés sur le PC (notes.json).
+var ann = { doc: null, pages: [], notes: {} };
+const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+async function loadAnn(force) {
+  const doc = docState.doc;
+  if (!doc || (!force && ann.doc === doc)) return;
+  try {
+    const [a, n] = await Promise.all([fetch(`/api/annotations/${doc}`).then(r => r.json()), fetch(`/api/notes/${doc}`).then(r => r.json())]);
+    if (doc !== docState.doc) return;
+    ann = { doc, pages: a.pages || [], notes: n.notes || {} };
+  } catch (e) { return; }
+  drawBadges();
+  renderNotesPanel();
+}
+const noteOf = a => (a && a.key && ann.notes[a.key] ? ann.notes[a.key].note : '');
+function renderNotesPanel() {
+  const box = $('#nlist');
+  if ($('#pNotes').hidden) return;
+  if (!ann.pages.length) { box.innerHTML = '<p class="hint">Aucune annotation dans ce document.</p>'; return; }
+  let h = '';
+  ann.pages.forEach((p, pi) => {
+    h += `<h3 data-p="${pi}">Page ${p.page + 1}</h3>`;
+    p.items.forEach((a, ai) => {
+      const t = a.text ? esc(a.text) : '<span class="ink">(surlignage sans texte reconnu)</span>';
+      const n = noteOf(a);
+      h += `<div class="ni" data-p="${pi}" data-a="${ai}"><span class="sw" style="background:${esc(a.color)}"></span><span>${t}`
+         + (n ? `<span class="nnote">${esc(n)}</span>` : '') + `</span></div>`;
+    });
+    if (p.ink) h += `<div class="ni" data-p="${pi}"><span class="sw" style="background:transparent;box-shadow:none">✎</span><span class="ink">${p.ink} trait${p.ink > 1 ? 's' : ''} manuscrit${p.ink > 1 ? 's' : ''}</span></div>`;
+  });
+  box.innerHTML = h;
+}
+// pastilles sur les passages commentés
+function drawBadges() {
+  document.querySelectorAll('.docpage .nbadge').forEach(e => e.remove());
+  for (const p of ann.pages) {
+    const d = pageEl(p.page);
+    if (!d || !p.bounds) continue;
+    const [bx, by, bw, bh] = p.bounds;
+    for (const a of p.items) {
+      if (!noteOf(a) || !a.quads || !a.quads.length) continue;
+      const q = a.quads[0], e = document.createElement('button');
+      e.className = 'nbadge'; e.title = noteOf(a);
+      e.innerHTML = '<svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>';
+      e.style.left = `${(q[0] + q[2] - bx) / bw * 100}%`; e.style.top = `${(q[1] - by) / bh * 100}%`;
+      e.onclick = ev => { ev.stopPropagation(); openNote(p, a, ev.clientX, ev.clientY); };
+      d.append(e);
+    }
+  }
+}
+// clic sur un passage surligné (outil Voir) : éditeur de commentaire
+function highlightAt(d, ev) {
+  const p = ann.pages.find(x => x.page === +d.dataset.i);
+  if (!p || !p.bounds) return null;
+  const [bx, by, bw, bh] = p.bounds, r = d.getBoundingClientRect();
+  const sx = bx + (ev.clientX - r.left) / r.width * bw, sy = by + (ev.clientY - r.top) / r.height * bh;
+  for (const a of p.items) for (const [x, y, w, h] of (a.quads || a.rects || []))
+    if (sx >= x - 3 && sx <= x + w + 3 && sy >= y - 3 && sy <= y + h + 3) return { p, a };
+  return null;
+}
+var noteCur = null;
+function openNote(p, a, cx, cy) {
+  noteCur = { p, a };
+  const ed = $('#noteed');
+  $('#notequote').textContent = a.text || '(surlignage sans texte reconnu)';
+  $('#notequote').style.borderColor = a.color;
+  $('#notetxt').value = noteOf(a);
+  $('#notedel').hidden = !noteOf(a);
+  ed.hidden = false;
+  const w = ed.offsetWidth, h = ed.offsetHeight;
+  ed.style.left = Math.max(8, Math.min(cx - w / 2, innerWidth - w - 8)) + 'px';
+  ed.style.top = (cy + 16 + h > innerHeight ? Math.max(8, cy - h - 16) : cy + 16) + 'px';
+  $('#notetxt').focus();
+}
+async function saveNote(text) {
+  if (!noteCur) return;
+  const { p, a } = noteCur;
+  const r = await post('/api/notes', { doc: ann.doc, key: a.key, note: text, text: a.text, page: p.page });
+  if (!r.ok) return status('Commentaire non enregistré : ' + (r.error || '?'));
+  if (r.note) ann.notes[a.key] = r.note; else delete ann.notes[a.key];
+  $('#noteed').hidden = true; noteCur = null;
+  drawBadges(); renderNotesPanel();
+  status(text.trim() ? 'Commentaire enregistré (sur le PC)' : 'Commentaire supprimé');
+}
+$('#notesave').onclick = () => saveNote($('#notetxt').value);
+$('#notedel').onclick = () => saveNote('');
+$('#noteclose').onclick = () => { $('#noteed').hidden = true; noteCur = null; };
+$('#notetxt').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); saveNote($('#notetxt').value); }
+  if (e.key === 'Escape') { e.preventDefault(); $('#noteed').hidden = true; noteCur = null; }
+});
+$('#nlist').addEventListener('click', async e => {
+  const el = e.target.closest('[data-p]');
+  if (!el) return;
+  const p = ann.pages[+el.dataset.p], d = pageEl(p.page);
+  if (!d) return;
+  const a = el.dataset.a !== undefined ? p.items[+el.dataset.a] : null;
+  if (a && a.rects && a.rects.length && await ensureText(d)) {
+    scrollToRect(d, (a.quads || a.rects)[0], true);
+    if (a.key) {                                   // éditeur ouvert à côté du passage
+      const [bx, by, bw, bh] = p.bounds || d._text.bounds, q = (a.quads || a.rects)[0], r = d.getBoundingClientRect();
+      openNote(p, a, r.left + (q[0] + q[2] / 2 - bx) / bw * r.width, r.top + (q[1] + q[3] - by) / bh * r.height);
+    }
+  } else d.scrollIntoView({ block: 'start' });
+});
+$('#nreload').onclick = () => loadAnn(true);
+$('#ncopy').onclick = () => {
+  const out = [];
+  for (const p of ann.pages) for (const a of p.items) if (a.text) {
+    const n = noteOf(a);
+    out.push(`> ${a.text}\n> — p. ${p.page + 1}\n` + (n ? `\n${n}\n` : ''));
+  }
+  if (!out.length) return status('Aucun surlignage avec du texte à copier');
+  navigator.clipboard.writeText(`## ${docState.name || 'Document'}\n\n` + out.join('\n')).then(
+    () => status(`${out.length} surlignage${out.length > 1 ? 's' : ''} copié${out.length > 1 ? 's' : ''} (Markdown)`), () => status('Copie impossible'));
+};
+document.querySelector('[data-panel="pNotes"]').addEventListener('click', () => setTimeout(() => { renderNotesPanel(); loadAnn(true); }, 0));
+setInterval(() => {
+  if (docState.doc && ann.doc !== docState.doc) { loadAnn(true); closeFind(); }
+}, 1500);
+setInterval(() => { if (docState.doc && !document.hidden) loadAnn(true); }, 20000);   // pages réenregistrées par la tablette
+
+// surligneur à la taille du texte (réglage du serveur)
+fetch('/api/autohl').then(r => r.json()).then(r => { $('#autohl').checked = !!r.on; }).catch(() => {});
+$('#autohl').addEventListener('change', async e => {
+  const r = await post('/api/autohl', { on: e.target.checked });
+  status(r.on ? 'Surligneur à la taille du texte : activé (survolez une ligne avec le surligneur)' : 'Surligneur à la taille du texte : désactivé');
 });
 </script>
 </body>

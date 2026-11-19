@@ -161,3 +161,14 @@ entrée (`… & P=$!; read _; kill $P`), sinon elles s'accumulent.
   avec `Match originalhost … exec "test TCP vers 10.11.99.1:22"` choisit l'USB s'il répond, sinon le Wi-Fi.
 - **Synchro légère** : `find -newer <repère>` (repère dans `/tmp` de la tablette, en mémoire) puis
   `rsync --files-from` : ~0,3 s de processeur pour 16 500 fichiers.
+- **Surligneur** : un trait de surligneur non accroché au texte est une droite (`HIGHLIGHTER_2`) dont la largeur
+  enregistrée dans chaque point vaut 4 × les unités de page ; la largeur de la bande vaut **30 × l'épaisseur du
+  crayon** (`thickness_scale`). Le surlignage « accroché au texte » est un élément à part (`GlyphRange`) qui
+  enregistre le texte lui-même.
+- **Identifiant stable d'un trait** : sa clé CRDT dans la scène (`CrdtId(auteur, n)`), conservée d'un
+  enregistrement à l'autre : avec l'identifiant de la page, elle suffit à rattacher des données (commentaires).
+- **Une capture d'écran gardée en mémoire vieillit** : un serveur qui s'endort doit l'oublier à son réveil.
+- **Annotations PDF lisibles par Zotero** : `/Highlight` avec `/QuadPoints` par ligne (haut-gauche, haut-droite,
+  bas-gauche, bas-droite), un rendu `/AP` (fondu « multiplier »), et le commentaire dans `/Contents` (Zotero relit
+  lui-même le texte sous les zones).
+- **Les blocs inconnus 14 et 15** apparaissent dans les pages 3.30 (rmscene 0.8 les ignore sans dommage).

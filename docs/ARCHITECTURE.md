@@ -26,7 +26,12 @@
   L'état du crayon arrive dans `vue.json`. xovi-message-broker ne sert plus qu'aux actions ponctuelles (ouvrir
   une page, recharger les liens) : sollicité en continu, il fait planter l'interface.
 - **Synchro** : `autosync.py` (toutes les 10 s : fichiers modifiés depuis le passage précédent, puis rsync).
-- **Export PDF** : `export_pdf.py` (pypdf + CairoSVG) : pages d'origine + encre en vectoriel.
+- **Export PDF** : `export_pdf.py` (pypdf + CairoSVG) : pages d'origine + encre en vectoriel + surlignages
+  exportés en annotations `/Highlight` (commentaire dans `/Contents`).
+- **Texte et annotations** : `annots.py` (recherche, surlignages et leur texte, commentaires `notes.json`,
+  recherche globale sur cache, préchauffage au démarrage).
+- **Surligneur auto** : `autohl.py` (flux du stylet en survol + page affichée + texte → réglage `pen`).
+- **Envoi de fichiers** : `/api/upload` → interface web USB de la tablette (`http://10.11.99.1/upload`).
 - **Liaison** : `live.py` génère `.ssh_config` (alias `remarkable` : USB si joignable, sinon Wi-Fi de `tablette.conf`).
 - **Formes** : gabarits (droite redressée) copiés une fois par style (`formes-etat.js`, partagé entre pages),
   puis collés/étirés/tournés par `SceneController`. Voir [DECOUVERTES.md](DECOUVERTES.md) §5.
