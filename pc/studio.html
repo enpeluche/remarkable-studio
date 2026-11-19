@@ -468,17 +468,19 @@ async function loadPdfBg(s) {
 }
 var workC = document.createElement('canvas'); workC.width = W; workC.height = H;
 var workX = workC.getContext('2d', { willReadFrequently: true });
-function drawLiveFrame() {
-  const img = $('#scr');
-  if (!liveEl || liveEl.hidden || !img.complete || !img.naturalWidth || !Array.isArray(frameVue.map)) return;
-  const fc = liveEl.querySelector('.lvf').getContext('2d'), bc = liveEl.querySelector('.lvb').getContext('2d');
+// Fond (PDF dans le repère de l'écran, sa luminance, son minimum 3x3, ses zones colorées) : ne dépend que de la
+// vue et de la page -> calculé une fois par vue (~80 ms), pas à chaque image (2 par seconde pendant l'écriture).
+var liveBg = { key: '', mn: null, pcol: null };
+function liveBackground(bc) {
+  const bmp = pdfBg.key === docState.doc + '/' + docState.page ? pdfBg.bmp : null;
+  const key = JSON.stringify([frameVue.map, frameVue.mask, pdfBg.key, !!bmp]);
+  if (liveBg.key === key && liveBg.mn) return liveBg;
   // 1) PDF seul, dans le repère de l'écran physique (inverse de la correspondance écran -> page)
   const [ox, oy, ax, ay, bx, by] = frameVue.map;
   const A = [(ax - ox) / W, (ay - oy) / W, (bx - ox) / H, (by - oy) / H], det = A[0] * A[3] - A[1] * A[2];
   const P = [A[3] / det, -A[1] / det, -A[2] / det, A[0] / det];          // page -> écran (partie linéaire)
   bc.setTransform(1, 0, 0, 1, 0, 0);
   bc.fillStyle = '#fff'; bc.fillRect(0, 0, W, H);
-  const bmp = pdfBg.key === docState.doc + '/' + docState.page ? pdfBg.bmp : null;
   if (bmp) {
     const x0 = -bmp.width / 2;                                             // 227 dpi : 1 pixel = 1 unité de page
     bc.setTransform(P[0], P[1], P[2], P[3], P[0] * (x0 - ox) + P[2] * (0 - oy), P[1] * (x0 - ox) + P[3] * (0 - oy));
@@ -486,42 +488,52 @@ function drawLiveFrame() {
     bc.drawImage(bmp, 0, 0);
     bc.setTransform(1, 0, 0, 1, 0, 0);
   }
-  // 2) encre = pixels de l'écran plus sombres que le PDF alentour (min 3x3 : tolère l'anticrénelage),
-  //    ou colorés là où le PDF ne l'est pas
-  workX.drawImage(img, 0, 0, W, H);
-  const live = workX.getImageData(0, 0, W, H), L = live.data;
   const pdf = bc.getImageData(0, 0, W, H).data;
-  const lum = new Uint8Array(W * H);
-  for (let i = 0, j = 0; j < lum.length; i += 4, j++) lum[j] = (pdf[i] * 77 + pdf[i + 1] * 150 + pdf[i + 2] * 29) >> 8;
-  const mn = new Uint8Array(W * H);                                        // minimum 3x3 (horizontal puis vertical)
-  const tmp = new Uint8Array(W * H);
+  const lum = new Uint8Array(W * H), pcol = new Uint8Array(W * H);
+  for (let i = 0, j = 0; j < lum.length; i += 4, j++) {
+    lum[j] = (pdf[i] * 77 + pdf[i + 1] * 150 + pdf[i + 2] * 29) >> 8;
+    pcol[j] = Math.max(pdf[i], pdf[i + 1], pdf[i + 2]) - Math.min(pdf[i], pdf[i + 1], pdf[i + 2]) >= 25 ? 1 : 0;
+  }
+  const mn = new Uint8Array(W * H), tmp = new Uint8Array(W * H);         // minimum 3x3 (horizontal puis vertical)
   for (let y = 0; y < H; y++) { const r = y * W;
     for (let x = 0; x < W; x++) { let m = lum[r + x]; if (x > 0 && lum[r + x - 1] < m) m = lum[r + x - 1]; if (x < W - 1 && lum[r + x + 1] < m) m = lum[r + x + 1]; tmp[r + x] = m; } }
   for (let y = 0; y < H; y++) { const r = y * W;
     for (let x = 0; x < W; x++) { let m = tmp[r + x]; if (y > 0 && tmp[r - W + x] < m) m = tmp[r - W + x]; if (y < H - 1 && tmp[r + W + x] < m) m = tmp[r + W + x]; mn[r + x] = m; } }
-  for (let i = 0, j = 0; j < mn.length; i += 4, j++) {
-    const r = L[i], g = L[i + 1], b = L[i + 2];
-    const l = (r * 77 + g * 150 + b * 29) >> 8;
-    const chroma = Math.max(r, g, b) - Math.min(r, g, b);
-    const pc = Math.max(pdf[i], pdf[i + 1], pdf[i + 2]) - Math.min(pdf[i], pdf[i + 1], pdf[i + 2]);
-    if (!(mn[j] - l > 30 || (chroma > 45 && pc < 25))) L[i + 3] = 0;
-  }
-  fc.putImageData(live, 0, 0);
-  confirmStrokes(L, mn);
-  // 3) interface de la tablette : cases vidées dans les deux calques
+  // 3) interface de la tablette : cases vidées (fond)
+  maskCells((x, y, c) => bc.clearRect(x - 2, y - 2, c + 4, c + 4));
+  liveBg = { key, mn, pcol };
+  return liveBg;
+}
+function maskCells(fn) {
   const m = frameVue.mask, cell = frameVue.cell || 24;
   if (!m) return;
   const cols = Math.ceil(W / cell);
   for (let i = 0; i < m.length; i++) {
     const n = parseInt(m[i], 16);
     if (!n) continue;
-    for (let b = 0; b < 4; b++) {
-      if (!(n & (8 >> b))) continue;
-      const q = i * 4 + b, x = (q % cols) * cell, y = Math.floor(q / cols) * cell;
-      fc.clearRect(x - 2, y - 2, cell + 4, cell + 4);
-      bc.clearRect(x - 2, y - 2, cell + 4, cell + 4);
-    }
+    for (let b = 0; b < 4; b++) if (n & (8 >> b)) { const q = i * 4 + b; fn((q % cols) * cell, Math.floor(q / cols) * cell, cell); }
   }
+}
+function drawLiveFrame() {
+  const img = $('#scr');
+  if (!liveEl || liveEl.hidden || !img.complete || !img.naturalWidth || !Array.isArray(frameVue.map)) return;
+  const fc = liveEl.querySelector('.lvf').getContext('2d'), bc = liveEl.querySelector('.lvb').getContext('2d', { willReadFrequently: true });
+  const { mn, pcol } = liveBackground(bc);
+  // 2) encre = pixels de l'écran plus sombres que le PDF alentour (min 3x3 : tolère l'anticrénelage),
+  //    ou colorés là où le PDF ne l'est pas
+  workX.drawImage(img, 0, 0, W, H);
+  const live = workX.getImageData(0, 0, W, H), L = live.data;
+  for (let i = 0, j = 0; j < mn.length; i += 4, j++) {
+    const r = L[i], g = L[i + 1], b = L[i + 2];
+    const l = (r * 77 + g * 150 + b * 29) >> 8;
+    if (mn[j] - l > 30) continue;
+    if (!pcol[j] && (r > g ? (r > b ? r : b) : (g > b ? g : b)) - (r < g ? (r < b ? r : b) : (g < b ? g : b)) > 45) continue;
+    L[i + 3] = 0;
+  }
+  fc.putImageData(live, 0, 0);
+  confirmStrokes(L, mn);
+  // 3) interface de la tablette : cases vidées
+  maskCells((x, y, c) => fc.clearRect(x - 2, y - 2, c + 4, c + 4));
 }
 // Tracé provisoire (stylet) retiré seulement quand l'image capturée montre l'encre à sa place : la tablette
 // ne l'a pas toujours déjà dessiné dans la mémoire lue (sinon le mot disparaissait quelques secondes).
