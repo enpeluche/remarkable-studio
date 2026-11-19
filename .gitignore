@@ -14,6 +14,8 @@ pc/.ssh_config
 pc/notes.json
 pc/reglages.json
 pc/cadrage.json
+pc/envoi.json
+pc/envoi/
 *.rm
 *.metadata
 *.content

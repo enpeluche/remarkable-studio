@@ -204,19 +204,29 @@ def search_highlights(lib, renderer, query, limit=300):
     for uid, it in list(lib.snapshot().items()):
         if it["type"] == "folder" or it.get("parent") == "trash":
             continue
+        before = missing[0]
         try:
             pages = document_annotations(lib, renderer, uid, cached_only=True, missing=missing) or []
         except Exception:
             continue
         notes = doc_notes(uid)
+        keys = set()
         for p in pages:
             for a in p["items"]:
+                keys.add(a.get("key"))
                 note = (notes.get(a.get("key")) or {}).get("note", "")
                 if (a.get("text") and q in norm(a["text"])) or (note and q in norm(note)):
                     res.append({"doc": uid, "name": it["name"], "page": p["page"], "text": a["text"],
                                 "color": a["color"], "note": note})
                     if len(res) >= limit:
                         return res, missing[0]
+        # commentaires dont le surlignage a été supprimé sur la tablette : toujours trouvables (analyse complète
+        # du document seulement, sinon un surlignage pas encore analysé passerait pour supprimé)
+        if missing[0] == before:
+            for k, n in notes.items():
+                if k not in keys and (q in norm(n.get("text") or "") or q in norm(n.get("note") or "")):
+                    res.append({"doc": uid, "name": it["name"], "page": n.get("page") or 0, "text": n.get("text") or "",
+                                "color": "transparent", "note": n.get("note", ""), "supprime": True})
     return res, missing[0]
 
 

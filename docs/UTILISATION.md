@@ -51,6 +51,10 @@
   souligner, barrer (tracé sur la tablette, la page y est ouverte d'abord ; un document doit déjà être ouvert
   sur la tablette) ou copier.
 
+- **Sans la tablette** : surligner, importer un fichier, lier des carnets restent possibles ; c'est gardé sur le PC
+  (pastille en bas à gauche, marques en pointillés : clic pour annuler) et fait dès que la tablette revient.
+  Sans le PC, la tablette fonctionne normalement ; le PC rattrape à la reconnexion.
+
 ## Sur la tablette
 
 - **Menu du crayon** : sous les épaisseurs, un curseur continu ; à droite, « Couleurs libres » (palette partagée

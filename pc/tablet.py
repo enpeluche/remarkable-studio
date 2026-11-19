@@ -5,7 +5,7 @@ import threading
 import time
 from pathlib import Path
 
-from live import RM_HOST, SSH_OPTS, ssh, note_wifi
+from live import RM_HOST, SSH_OPTS, USB_IP, ssh, note_wifi
 
 HERE = Path(__file__).resolve().parent
 LINKS_FILE = HERE / "carnets-lies.json"            # source de vérité, côté PC
@@ -103,27 +103,59 @@ TABLET_PALETTE = "/home/root/crayons.json"
 PALETTE_FILE = HERE / "crayons.json"     # copie locale (la tablette fait foi quand elle est connectée)
 
 
-def get_palette():
-    try:
-        r = ssh(f"cat {TABLET_PALETTE}", timeout=8)
-        if r.returncode == 0 and r.stdout.strip():
-            data = json.loads(r.stdout)
-            PALETTE_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=1))
-            return data.get("palette", []), True
-    except Exception:
-        pass
+def get_palette(local=False):
+    """Palette de la tablette (copiée sur le PC) ; local=True ou tablette absente : copie du PC."""
+    if not local:
+        try:
+            r = ssh(f"cat {TABLET_PALETTE}", timeout=8)
+            if r.returncode == 0 and r.stdout.strip():
+                data = json.loads(r.stdout)
+                PALETTE_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=1))
+                return data.get("palette", []), True
+        except Exception:
+            pass
     try:
         return json.loads(PALETTE_FILE.read_text()).get("palette", []), False
     except Exception:
         return [], False
 
 
-def set_palette(palette):
-    data = json.dumps({"palette": palette}, ensure_ascii=False, indent=1)
-    PALETTE_FILE.write_text(data)
+def save_palette(palette):
+    """Palette enregistrée sur le PC ; copiée sur la tablette par la file d'envoi (push_palette)."""
+    PALETTE_FILE.write_text(json.dumps({"palette": palette}, ensure_ascii=False, indent=1))
+
+
+def push_palette():
+    try:
+        data = PALETTE_FILE.read_bytes()
+    except OSError:
+        return False
     r = subprocess.run(["ssh", *SSH_OPTS, RM_HOST, f"cat > {TABLET_PALETTE}.tmp && mv {TABLET_PALETTE}.tmp {TABLET_PALETTE}"],
-                       input=data.encode(), capture_output=True, timeout=15)
+                       input=data, capture_output=True, timeout=15)
     return r.returncode == 0
+
+
+def upload_usb(name, data):
+    """Import d'un PDF / EPUB par l'interface web USB de la tablette (Paramètres > Stockage) : la tablette
+    l'importe elle-même, sans redémarrage. -> (ok, message)"""
+    import hashlib
+    import urllib.error
+    import urllib.request
+    ext = name.rsplit(".", 1)[-1].lower()
+    ctype = "application/pdf" if ext == "pdf" else "application/epub+zip"
+    boundary = "----rmstudio" + hashlib.sha1(data[:4096] + name.encode()).hexdigest()[:16]
+    payload = (f"--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; "
+               f"filename=\"{name.replace(chr(34), '')}\"\r\nContent-Type: {ctype}\r\n\r\n").encode() \
+        + data + f"\r\n--{boundary}--\r\n".encode()
+    req = urllib.request.Request(f"http://{USB_IP}/upload", data=payload, method="POST",
+                                 headers={"Content-Type": f"multipart/form-data; boundary={boundary}"})
+    try:
+        with urllib.request.urlopen(req, timeout=120) as r:
+            return 200 <= r.status < 300, "importé"
+    except urllib.error.HTTPError as e:
+        return False, f"la tablette a refusé le fichier ({e.code})"
+    except Exception:
+        return False, "interface web USB injoignable (Paramètres > Stockage > Interface web USB)"
 
 
 FORMES_CMD = "/home/root/xovi/crayons/formes-cmd.json"

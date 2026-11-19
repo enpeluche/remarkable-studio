@@ -45,6 +45,7 @@ import formules
 import screen
 import autosync
 import cadrage
+import envoi
 import export_pdf
 import annots
 import autohl
@@ -629,7 +630,13 @@ class Handler(BaseHTTPRequestHandler):
             if parts == ["api", "pen"]:
                 # état du crayon lu dans vue.json (plus de penGet par xovi-message-broker : plantages)
                 return self.json({"pen": self.current.get().get("pen")})
+            if parts == ["api", "envoi"]:
+                q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+                return self.json(self.envoi.summary(q.get("doc", [None])[0]))
             if parts == ["api", "palette"]:
+                if any(e["type"] == "palette" for e in self.envoi.pending()):
+                    # changement pas encore copié sur la tablette : la copie du PC fait foi
+                    return self.json({"palette": tablet.get_palette(local=True)[0], "fromTablet": False})
                 pal, live_ = tablet.get_palette()
                 return self.json({"palette": pal, "fromTablet": live_})
             if len(parts) == 4 and parts[:2] == ["api", "page"] and UUID_RE.match(parts[2]):
@@ -725,22 +732,8 @@ class Handler(BaseHTTPRequestHandler):
                 data = body_raw
                 if not data or len(data) > 200 * 1024 * 1024:
                     return self.json({"ok": False, "error": "fichier vide ou trop gros"}, 400)
-                ctype = "application/pdf" if ext == ".pdf" else "application/epub+zip"
-                boundary = "----rmstudio" + hashlib.sha1(data[:4096] + name.encode()).hexdigest()[:16]
-                payload = (f"--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; "
-                           f"filename=\"{name.replace(chr(34), '')}\"\r\nContent-Type: {ctype}\r\n\r\n").encode() \
-                    + data + f"\r\n--{boundary}--\r\n".encode()
-                req = urllib.request.Request("http://10.11.99.1/upload", data=payload, method="POST",
-                                             headers={"Content-Type": f"multipart/form-data; boundary={boundary}"})
-                try:
-                    with urllib.request.urlopen(req, timeout=120) as r:
-                        ok = 200 <= r.status < 300
-                except urllib.error.HTTPError as e:
-                    return self.json({"ok": False, "error": f"la tablette a refusé le fichier ({e.code})"})
-                except Exception:
-                    return self.json({"ok": False, "error": "interface web USB injoignable : brancher la tablette en "
-                                                            "USB et activer Paramètres > Stockage > Interface web USB"})
-                return self.json({"ok": ok, "name": name})
+                # file d'envoi : importé tout de suite en USB, sinon dès que la tablette est branchée en USB
+                return self.json(self.envoi.reply(self.envoi.add_upload(name, data), 120))
             if path == "/api/tablet/open":
                 doc = body.get("doc")
                 if doc not in items:
@@ -758,20 +751,6 @@ class Handler(BaseHTTPRequestHandler):
                 rects = [[float(v) for v in r[:4]] for r in (body.get("rects") or [])[:200]]
                 if not rects:
                     return self.json({"ok": False, "error": "rien à marquer"}, 400)
-                st = self.current.get()
-                if st.get("doc") != doc or st.get("page") != n:
-                    tablet.open_document(doc, n)
-                    t_end = time.time() + 10
-                    while time.time() < t_end:
-                        time.sleep(0.8)
-                        self.current.t = 0                       # forcer une nouvelle lecture
-                        st = self.current.get()
-                        if st.get("doc") == doc and st.get("page") == n:
-                            break
-                    else:
-                        return self.json({"ok": False, "error": "impossible d'ouvrir la page sur la tablette (un document doit y être ouvert)"})
-                    # page tout juste ouverte : bandeau de titre et rendu en cours, laisser l'affichage se stabiliser
-                    time.sleep(1.5)
                 argb = int(body.get("argb") or 0) & 0xFFFFFFFF
                 segs = []
                 for x, y, w, h in rects:
@@ -782,11 +761,12 @@ class Handler(BaseHTTPRequestHandler):
                         segs.append([x, yy, x + w, yy, 0])
                 pen = ({"tool": 18, "argb": argb or 0xFFFBF06A} if kind == "highlight"
                        else {"tool": 17, "argb": argb or 0xFF000000, "thickness": 2})
-                cmd = {"action": "marks", "page": it["pages"][n]["id"], "pen": pen,
-                       "segs": [[round(v, 2) for v in sg] for sg in segs]}
+                # file d'envoi : tracé tout de suite si possible, sinon dès que la page est affichée sur la tablette
+                e = self.envoi.add("marks", doc=doc, page=n, page_id=it["pages"][n]["id"], kind=kind, pen=pen,
+                                   segs=[[round(v, 2) for v in sg] for sg in segs], rects=rects, direct=True,
+                                   couleur=f"#{argb & 0xFFFFFF:06x}" if argb else None)
                 self.screen.boost(4)
-                ok, msg = tablet.formes_run(cmd)              # attend le compte rendu de la tablette
-                return self.json({"ok": ok, "message": msg} if ok else {"ok": False, "error": msg})
+                return self.json(self.envoi.reply(e, 60))
             if path == "/api/formes/build":
                 shape = body.get("shape")
                 if shape not in ("line", "rect", "circle", "ellipse", "grid", "polygon", "axes"):
@@ -855,7 +835,9 @@ class Handler(BaseHTTPRequestHandler):
                 pal = body.get("palette")
                 if not isinstance(pal, list):
                     return self.json({"ok": False, "error": "palette invalide"}, 400)
-                return self.json({"ok": True, "pushed": tablet.set_palette(pal)})
+                tablet.save_palette(pal)
+                r = self.envoi.reply(self.envoi.add("palette"), 15)
+                return self.json({**r, "ok": True, "pushed": r.get("ok") and not r.get("queued")})
             if path == "/api/tablet/start":
                 return self.json({"ok": tablet.start_mods()})
             if path == "/api/links":
@@ -863,8 +845,10 @@ class Handler(BaseHTTPRequestHandler):
                 if a not in items or (b is not None and (b not in items or b == a)):
                     return self.json({"ok": False, "error": "document inconnu"}, 400)
                 tablet.set_link(items, a, b)
-                push = tablet.push_links()
-                return self.json({"ok": True, **push})
+                r = self.envoi.reply(self.envoi.add("links"), 15)
+                return self.json({**r, "ok": True, "pushed": r.get("ok") and not r.get("queued")})
+            if path == "/api/envoi/annuler":
+                return self.json({"ok": self.envoi.cancel(str(body.get("id") or ""))})
             return self.send(404, b"not found", "text/plain")
         except (BrokenPipeError, ConnectionResetError):
             pass
@@ -887,6 +871,7 @@ def main():
     Handler.sync = autosync.AutoSync(lib, Path(a.data), active=lambda: time.time() - Handler.last_request < 120)
     Handler.autohl = autohl.AutoHighlighter(Handler.pen, Handler.current, Handler.renderer)
     Handler.cadreur = cadrage.Cadreur(lib, Handler.current, tablet.formes_cmd)
+    Handler.envoi = envoi.Envoi(lib, Handler.current, Handler.sync, tablet.upload_usb)
     threading.Thread(target=annots.warm_up, args=(lib, Handler.renderer), daemon=True).start()
     threading.Thread(target=_prune_loop, args=(Handler.renderer.cache,), daemon=True).start()
     srv = ThreadingHTTPServer(("127.0.0.1", a.port), Handler)

@@ -86,6 +86,7 @@ header h1 { font-size: 15px; margin: 0; }
 #pNotes .nbar .ctl { padding: 4px 9px; font-size: 12.5px; }
 .nlist { max-height: min(60vh, 560px); overflow: auto; margin: 0 -4px; padding: 0 4px; }
 .nlist h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--site-violet); margin: 10px 0 4px; cursor: pointer; }
+.nlist .ndel { display: block; margin-top: 4px; font-size: 11.5px; padding: 2px 8px; }
 .nlist .ni { display: flex; gap: 8px; align-items: flex-start; padding: 6px; border-radius: 5px; cursor: pointer; font-size: 13px; line-height: 1.35; }
 .nlist .ni:hover { background: var(--hover); }
 .nlist .sw { flex: none; width: 12px; height: 12px; border-radius: 3px; margin-top: 3px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.15); }
@@ -160,6 +161,7 @@ label.chk { display: inline-flex; gap: 6px; align-items: center; font-size: 12.5
 <link rel="stylesheet" href="/static/theme.css">
 <script src="/static/theme.js"></script>
 <script src="/static/textlayer.js"></script>
+<script src="/static/envoi.js"></script>
 </head>
 <body>
 <header>
@@ -842,12 +844,16 @@ async function annotate(info, kind, color) {
   TextLayer.pending(info, kind, color);
   status(info.page !== docState.page ? `Ouverture de la page ${info.page + 1} sur la tablette…` : label + ' envoyé…', 0);
   const r = await post('/api/annot', { doc: docState.doc, page: info.page, kind, argb: argbHex(color), rects: info.rects });
-  status(r.ok ? `${label} : ${info.rects.length} ligne${info.rects.length > 1 ? 's' : ''}, page ${info.page + 1}` : 'Échec : ' + (r.error || '?'));
+  status(!r.ok ? 'Échec : ' + (r.error || '?')
+         : r.queued ? `${label} gardé, ${r.message} (il ne sera pas perdu)`
+         : `${label} : ${info.rects.length} ligne${info.rects.length > 1 ? 's' : ''}, page ${info.page + 1}`, r.queued ? 9000 : 4000);
   if (!r.ok) info.d.querySelectorAll('.pend').forEach(e => e.remove());
+  EnvoiUI.refresh();
 }
 TextLayer.init({ pages: '.docpage', index: d => +d.dataset.i, doc: () => docState.doc, enabled: () => tool === 'view',
                  scroller: document.getElementById('docview'), annotate, notify: m => status(m) });
 const loadText = TextLayer.load;
+EnvoiUI.start({ doc: () => docState.doc, pages: '.docpage', index: d => +d.dataset.i, notify: m => status(m) });
 
 // ================================================================ zoom du Studio (indépendant de la tablette)
 var zoom = 1;
@@ -1026,6 +1032,16 @@ function renderNotesPanel() {
     });
     if (p.ink) h += `<div class="ni" data-p="${pi}"><span class="sw" style="background:transparent;box-shadow:none">✎</span><span class="ink">${p.ink} trait${p.ink > 1 ? 's' : ''} manuscrit${p.ink > 1 ? 's' : ''}</span></div>`;
   });
+  // commentaires dont le surlignage a été supprimé sur la tablette : gardés (jamais perdus), à effacer à la main
+  const keys = new Set(ann.pages.flatMap(p => p.items.map(a => a.key)));
+  const orph = Object.entries(ann.notes).filter(([k]) => !keys.has(k));
+  if (orph.length) {
+    h += `<h3>Surlignages supprimés sur la tablette</h3>`;
+    for (const [k, n] of orph)
+      h += `<div class="ni orph"><span class="sw" style="background:transparent;box-shadow:inset 0 0 0 1px var(--line)"></span><span>`
+         + `${n.text ? esc(n.text) : '<span class="ink">(texte inconnu)</span>'}${n.page != null ? ` <span class="ink">· p. ${n.page + 1}</span>` : ''}`
+         + `<span class="nnote">${esc(n.note)}</span><button class="ctl ndel" data-k="${esc(k)}">Effacer ce commentaire</button></span></div>`;
+  }
   box.innerHTML = h;
 }
 // pastilles sur les passages commentés
@@ -1088,6 +1104,12 @@ $('#notetxt').addEventListener('keydown', e => {
   if (e.key === 'Escape') { e.preventDefault(); $('#noteed').hidden = true; noteCur = null; }
 });
 $('#nlist').addEventListener('click', async e => {
+  const del = e.target.closest('.ndel');
+  if (del) {
+    if (!confirm('Effacer définitivement ce commentaire ?')) return;
+    await post('/api/notes', { doc: ann.doc, key: del.dataset.k, note: '' });
+    return loadAnn(true);
+  }
   const el = e.target.closest('[data-p]');
   if (!el) return;
   const p = ann.pages[+el.dataset.p], d = pageEl(p.page);

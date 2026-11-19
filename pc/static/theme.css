@@ -150,3 +150,15 @@ a.ctl:hover { color: var(--site-violet); }
 #selbar button:hover { background: var(--hover); color: var(--site-violet); border-color: var(--site-violet); }
 #selbar .sw { width: 18px; height: 18px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0,0,0,.18); }
 #selbar .sep { width: 1px; align-self: stretch; background: var(--line); margin: 2px 3px; }
+
+/* File d'envoi vers la tablette (static/envoi.js) */
+#envoipill { position: fixed; left: 14px; bottom: 14px; z-index: 60; max-width: min(560px, calc(100vw - 28px)); padding: 7px 12px;
+  background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-left: 3px solid #e0a100;
+  border-radius: 8px; box-shadow: var(--shadow); font-size: 12.5px; cursor: pointer; }
+#envoipill.bad { border-left-color: #c0392b; }
+#envoipill .list { margin-top: 6px; display: grid; gap: 4px; max-height: 40vh; overflow: auto; cursor: default; }
+#envoipill .list .ab { color: #c0392b; }
+#envoipill .list button { font: inherit; font-size: 11.5px; padding: 0 6px; border: 1px solid var(--line); border-radius: 4px;
+  background: none; color: inherit; cursor: pointer; }
+.queued { position: absolute; z-index: 5; border: 2px dashed #7451eb; border-radius: 2px; cursor: pointer; box-sizing: border-box; }
+.queued.underline, .queued.strike { border-width: 0 0 2px 0; }

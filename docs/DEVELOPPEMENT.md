@@ -16,6 +16,7 @@ tester, et les règles à respecter. Pour le *pourquoi* technique (format, adres
 | `tablet.py` | état de la tablette, ouverture de page, liens, palette, commandes pour `Formes.qml` (`formes_cmd`) |
 | `annots.py` | recherche dans le texte, annotations d'une page (surlignages + texte, traits), recherche globale, commentaires (`notes.json`) |
 | `autohl.py` | surligneur à la taille du texte (survol du stylet → épaisseur) |
+| `envoi.py` | file d'envoi vers la tablette (marques, imports, liens, palette) : persistante, confirmée, rejouée |
 | `cadrage.py` | cadrage automatique des PDF (mesure des marges, `zoomFit` envoyé à `Formes.qml`, confirmation par la sauvegarde) |
 | `autosync.py` | synchro de la sauvegarde toutes les 10 s (fichiers modifiés seulement) |
 | `export_pdf.py` | export PDF : pages d'origine + encre vectorielle + vrais surlignages PDF |
@@ -42,6 +43,22 @@ tester, et les règles à respecter. Pour le *pourquoi* technique (format, adres
 `extraire_qml.py` (étudier le QML d'une nouvelle version), `test_formes.py` (test complet des formes sur la tablette), `test_perf.py` (temps de réponse du serveur, coût
 de l'image en direct du Studio, avec seuils).
 
+## Synchronisation : chacun fonctionne sans l'autre
+
+- **La tablette est la référence pour son contenu** (documents, pages, surlignages, notes manuscrites). Elle
+  fonctionne seule ; le PC en garde une copie (`autosync.py`, rattrapage complet si la tablette a redémarré).
+- **Tout ce que le PC demande à la tablette passe par la file d'envoi** (`envoi.py`, `envoi.json`, fichiers joints
+  dans `envoi/`) : surligner / souligner / barrer, importer un PDF ou EPUB (USB), carnets liés, palette.
+  Rien n'est perdu si la tablette est absente : c'est exécuté dès que possible, et retiré de la file seulement
+  quand la tablette a confirmé (`resultat.json`, ou la copie synchronisée). Une marque demandée à l'instant ouvre
+  la page sur la tablette ; un rattrapage attend que la page y soit affichée (jamais de changement de page
+  imposé). Studio et bibliothèque montrent la file (pastille, marques en pointillés, annulation).
+- **Ce qui n'existe que sur le PC** (commentaires des surlignages, `notes.json`) n'est jamais effacé par la
+  tablette : un commentaire dont le surlignage a été supprimé reste visible (« surlignages supprimés ») et
+  trouvable.
+- **En direct seulement** (agissent sur la page affichée) : formes, dessin, formules du Studio, réglage du
+  crayon ; un échec est signalé, rien n'est mis en attente.
+
 ## Échanges PC ↔ tablette (tous par SSH)
 
 | Sens | Moyen | Contenu |
@@ -64,12 +81,12 @@ Lecture : `/` (bibliothèque), `/studio`, `/api/library`, `/api/library/version`
 `/api/pagebg/<doc>/<n>` (PDF seul), `/api/text/<doc>/<n>`, `/api/search/<doc>?q=`, `/api/annotations/<doc>`,
 `/api/notes/<doc>`, `/api/highlights?q=` (tous documents), `/api/export/<doc>.pdf[?annotees=1]`, `/api/thumb/<doc>`,
 `/api/file/<doc>.pdf|.epub`, `/api/live/state`, `/api/live/pen` (flux SSE), `/api/screen/next?after=<seq>`
-(image + en-têtes `X-Seq`, `X-Vue`), `/api/screen/stats`, `/api/pen`, `/api/palette`, `/api/autohl`, `/api/cadrage`,
+(image + en-têtes `X-Seq`, `X-Vue`), `/api/screen/stats`, `/api/pen`, `/api/palette`, `/api/autohl`, `/api/cadrage`, `/api/envoi[?doc=]`,
 `/api/tablet/status`.
 
 Écriture (POST, en-tête `X-RM-Viewer: 1` obligatoire) : `/api/tablet/open`, `/api/tablet/start`, `/api/links`,
 `/api/pen`, `/api/palette`, `/api/formes/build`, `/api/annot` (surligner/souligner/barrer), `/api/draw`,
-`/api/latex/render`, `/api/latex/send`, `/api/notes`, `/api/autohl`, `/api/cadrage`, `/api/upload` (corps brut + `X-Filename`).
+`/api/latex/render`, `/api/latex/send`, `/api/notes`, `/api/autohl`, `/api/cadrage`, `/api/envoi/annuler`, `/api/upload` (corps brut + `X-Filename`).
 
 ## Données et caches (jamais dans le dépôt)
 
@@ -79,6 +96,7 @@ Lecture : `/` (bibliothèque), `/studio`, `/api/library`, `/api/library/version`
 | `pc/.cache/` | pages rendues (SVG), PNG des PDF, texte extrait (`*-p<i>-text.json`), annotations par page (`*-annots2-<mtime>.json`), formules. Limité à 300 Mo : les rendus les moins récemment utilisés sont retirés (toutes les 30 min) |
 | `pc/notes.json` | commentaires des surlignages |
 | `pc/reglages.json` | réglages (surligneur auto, cadrage auto) |
+| `pc/envoi.json`, `pc/envoi/` | file d'envoi et fichiers à importer |
 | `pc/cadrage.json` | état du cadrage de chaque PDF (fait, aucun, envoyé, échec) |
 | `pc/tablette.conf`, `pc/.ssh_config` | adresse Wi-Fi, configuration SSH générée |
 | `pc/carnets-lies.json`, `pc/crayons.json` | liens entre documents, palette |
