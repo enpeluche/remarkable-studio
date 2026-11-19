@@ -119,6 +119,7 @@ class Library:
             "modified": int(meta.get("lastModified") or 0),
             "opened": int(meta.get("lastOpened") or 0),
             "pinned": bool(meta.get("pinned")),
+            "landscape": content.get("orientation") == "landscape",
             "lastPage": meta.get("lastOpenedPage") or 0,
             "pages": pages,
             "pageCount": len(pages),
@@ -171,8 +172,11 @@ def esc(s):
 
 
 class Bounds:
-    def __init__(self):
-        self.x0, self.x1, self.y0, self.y1 = -SCREEN_W / 2, SCREEN_W / 2, 0, SCREEN_H
+    """Étendue de la page (unités de page) : page de la tablette par défaut, portrait ou paysage (carnet en
+    paysage : 1872 x 1404, centrée en x = 0 comme sur la tablette), agrandie par l'encre qui déborde."""
+    def __init__(self, landscape=False):
+        w, h = (SCREEN_H, SCREEN_W) if landscape else (SCREEN_W, SCREEN_H)
+        self.x0, self.x1, self.y0, self.y1 = -w / 2, w / 2, 0, h
 
     def add(self, x, y):
         self.x0, self.x1 = min(self.x0, x), max(self.x1, x)
@@ -411,7 +415,7 @@ class Renderer:
         page = item["pages"][n]
         rm = self.lib.root / uid / f"{page['id']}.rm" if page["id"] else None
         sig = hashlib.sha1(json.dumps([page, rm.stat().st_mtime if rm and rm.exists() else 0,
-                                       item["modified"], 8, hd]).encode()).hexdigest()[:12]
+                                       item["modified"], item.get("landscape"), 9, hd]).encode()).hexdigest()[:12]
         return self.cache / f"{uid}-{n}-h{hd}-{sig}.svg", item, page, rm
 
     def page_bounds(self, uid, n):
@@ -440,7 +444,7 @@ class Renderer:
         with self._lock(str(dst)):
             if dst.exists():
                 return dst.read_bytes()
-            bounds = Bounds()
+            bounds = Bounds(item.get("landscape", False))
             bg = ""
             if item["type"] in ("pdf", "epub") and page["redir"] is not None:
                 dpi = 227 * hd                      # avant : 110 dpi agrandis x2 -> flou

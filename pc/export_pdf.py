@@ -85,7 +85,7 @@ def export(lib, uid, only_annotated=False, renderer=None):
             orig = reader.pages[page["redir"]]
             if rm and rm.exists() and b"version=6" not in rm.read_bytes()[:43]:
                 pass                                   # ancien format (v5) : placement différent, page seule
-        b = rv.Bounds()
+        b = rv.Bounds(item.get("landscape", False))
         if orig is not None:
             if orig.rotation:
                 orig.transfer_rotation_to_content()

@@ -197,3 +197,5 @@ entrée (`… & P=$!; read _; kill $P`), sinon elles s'accumulent.
 - **Tracé simulé juste après l'ouverture d'un document** : la tablette affiche un moment un bandeau de titre en
   haut de l'écran ; un trait injecté là touche l'interface, pas la page (gabarit jamais tracé). Laisser ~1,5 s à
   l'affichage, tracer les gabarits au milieu de l'écran, et réessayer à un autre emplacement.
+- **Carnet en paysage** : `.content` a `"orientation": "landscape"` ; la page fait alors 1872 × 1404 unités, centrée
+  en x = 0 (comme un PDF en paysage), au lieu de 1404 × 1872.
