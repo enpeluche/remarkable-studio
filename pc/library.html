@@ -138,6 +138,7 @@ main { overflow: auto; padding: 18px 24px 60px; }
 </style>
 <link rel="stylesheet" href="/static/theme.css">
 <script src="/static/theme.js"></script>
+<script src="/static/textlayer.js"></script>
 </head>
 <body>
 <div class="app">
@@ -357,7 +358,7 @@ function openDoc(id, page) {
     if (!e.isIntersecting) return;
     const box = e.target; obs.unobserve(box);
     const img = el('img', { src: box.dataset.src, alt: '' });
-    img.onload = () => box.querySelector('.ph')?.remove();
+    img.onload = () => { box.querySelector('.ph')?.remove(); if (cur && cur.type === 'pdf') TextLayer.load(box, cur.id, +box.dataset.n); };
     img.onerror = () => { const ph = box.querySelector('.ph'); if (ph) ph.textContent = 'Page illisible'; };
     box.prepend(img);
   }), { root: pages, rootMargin: '1200px 0px' });
@@ -390,6 +391,7 @@ function setCurrent(n, scroll = true) {
 function scrollToPage(n, behavior = 'smooth') { const p = $('#pg' + n); if (p) $('#pages').scrollTo({ top: p.offsetTop - 24, behavior }); }
 function closeDoc() {
   if (!cur) return;
+  TextLayer.hide(true);
   const parent = cur.parent; cur = null; $('#viewer').hidden = true; document.body.style.overflow = '';
   obs?.disconnect();
   location.hash = state.q ? '#' : (parent && parent !== ROOT && (items[parent] || parent === TRASH) ? '#/f/' + parent : '#');
@@ -464,6 +466,21 @@ document.addEventListener('keydown', e => {
 // ---------- tablette, liens
 let tab = { usb: false, mods: false };
 const post = (url, body) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-RM-Viewer': '1' }, body: JSON.stringify(body) }).then(r => r.json());
+// sélection du texte des PDF (static/textlayer.js) : copier, ou marquer sur la tablette (la page y est ouverte d'abord)
+TextLayer.init({
+  pages: '.page', index: d => +d.dataset.n, doc: () => cur && cur.id, scroller: $('#pages'),
+  notify: m => toast(m),
+  annotate: async (info, kind, color) => {
+    color = color || '#000000';
+    const label = { highlight: 'Surlignage', underline: 'Soulignement', strike: 'Barré' }[kind];
+    TextLayer.pending(info, kind, color);
+    toast(`${label} : envoi à la tablette (page ${info.page + 1})…`);
+    const argb = (0xFF000000 | parseInt(color.slice(1), 16)) >>> 0;
+    const r = await post('/api/annot', { doc: cur.id, page: info.page, kind, argb, rects: info.rects });
+    toast(r.ok ? `${label} posé sur la tablette, page ${info.page + 1}.` : 'Échec : ' + (r.error || '?'), 5000);
+    if (!r.ok) info.d.querySelectorAll('.pend').forEach(e => e.remove());
+  },
+});
 function toast(msg, ms = 3500) { const t = el('div', { class: 'toast' }, msg); document.body.append(t); setTimeout(() => t.remove(), ms); }
 async function pollTablet() {
   try { tab = await (await fetch('/api/tablet/status')).json(); } catch (e) { tab = { usb: false, mods: false }; }

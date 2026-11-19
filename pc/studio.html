@@ -48,12 +48,7 @@ header h1 { font-size: 15px; margin: 0; }
 .docpage .live { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
 .docpage .live canvas { position: absolute; left: 0; top: 0; width: 1404px; height: 1872px; max-width: none; transform-origin: 0 0; }
 /* couche de texte du PDF : invisible, sélectionnable (comme un lecteur PDF) */
-.docpage .txt { position: absolute; inset: 0; z-index: 4; container-type: inline-size; line-height: 1; }
-.docpage .txt span { position: absolute; white-space: pre; color: transparent; transform-origin: 0 0; cursor: text; font-family: Arial, Helvetica, sans-serif; }
-.docpage .txt span::selection { background: rgba(116, 81, 235, .28); }
 .docview.tooling .txt { pointer-events: none; }
-.docpage .pend { position: absolute; z-index: 3; pointer-events: none; }
-.docpage .pend.highlight { opacity: .45; }
 .zoom { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 5px; background: var(--panel); }
 .zoom button { border: 0; background: none; color: var(--ink); cursor: pointer; width: 28px; height: 28px; font: 600 16px/1 InterVariable, system-ui, sans-serif; border-radius: 5px; }
 .zoom button:hover { background: var(--hover); color: var(--site-violet); }
@@ -95,13 +90,6 @@ header h1 { font-size: 15px; margin: 0; }
 .nlist .ni:hover { background: var(--hover); }
 .nlist .sw { flex: none; width: 12px; height: 12px; border-radius: 3px; margin-top: 3px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.15); }
 .nlist .ink { color: var(--muted); }
-#selbar { position: fixed; z-index: 50; display: flex; align-items: center; gap: 4px; padding: 5px; background: var(--panel);
-  border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); }
-#selbar button { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 0;
-  border: 1px solid transparent; border-radius: 5px; background: none; color: var(--ink); cursor: pointer; }
-#selbar button:hover { background: var(--hover); color: var(--site-violet); border-color: var(--site-violet); }
-#selbar .sw { width: 18px; height: 18px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0,0,0,.18); }
-#selbar .sep { width: 1px; align-self: stretch; background: var(--line); margin: 2px 3px; }
 .docpage .live .frame { position: absolute; border: 1.5px dashed rgba(120,120,120,.55); box-sizing: border-box; }
 /* outils (dans l'en-tête, en ligne) */
 .tools { display: flex; gap: 3px; padding: 3px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
@@ -171,6 +159,7 @@ label.chk { display: inline-flex; gap: 6px; align-items: center; font-size: 12.5
 </style>
 <link rel="stylesheet" href="/static/theme.css">
 <script src="/static/theme.js"></script>
+<script src="/static/textlayer.js"></script>
 </head>
 <body>
 <header>
@@ -267,17 +256,6 @@ label.chk { display: inline-flex; gap: 6px; align-items: center; font-size: 12.5
   </section>
 </div>
 
-<div id="selbar" hidden>
-  <button data-hl="#FFE94D" title="Surligner en jaune"><span class="sw" style="background:#FFE94D"></span></button>
-  <button data-hl="#9BE36B" title="Surligner en vert"><span class="sw" style="background:#9BE36B"></span></button>
-  <button data-hl="#FF9AC8" title="Surligner en rose"><span class="sw" style="background:#FF9AC8"></span></button>
-  <button data-hl="#8FD3FF" title="Surligner en bleu"><span class="sw" style="background:#8FD3FF"></span></button>
-  <span class="sep"></span>
-  <button data-mk="underline" title="Souligner (couleur du crayon)"><svg class="ico" viewBox="0 0 24 24"><path d="M12 17c3.31 0 6-2.69 6-6V4c0-.55-.45-1-1-1s-1 .45-1 1v7c0 2.21-1.79 4-4 4s-4-1.79-4-4V4c0-.55-.45-1-1-1s-1 .45-1 1v7c0 3.31 2.69 6 6 6zM5 20c0 .55.45 1 1 1h12c.55 0 1-.45 1-1s-.45-1-1-1H6c-.55 0-1 .45-1 1z"/></svg></button>
-  <button data-mk="strike" title="Barrer (couleur du crayon)"><svg class="ico" viewBox="0 0 24 24"><path d="M10 19h4v-3h-4v3zM5 4v3h5v3h4V7h5V4H5zM3 14h18v-2H3v2z"/></svg></button>
-  <span class="sep"></span>
-  <button data-mk="copy" title="Copier le texte"><svg class="ico" viewBox="0 0 24 24"><path d="M15 20H5V7c0-.55-.45-1-1-1s-1 .45-1 1v13c0 1.1.9 2 2 2h10c.55 0 1-.45 1-1s-.45-1-1-1zm5-4V4c0-1.1-.9-2-2-2H9c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h9c1.1 0 2-.9 2-2zm-2 0H9V4h9v12z"/></svg></button>
-</div>
 
 <script>
 const $ = s => document.querySelector(s);
@@ -853,105 +831,23 @@ $('#fno').onclick = () => { fx = null; setTool('view'); };
 var textObs = new IntersectionObserver(es => es.forEach(e => {
   if (e.isIntersecting && !e.target.dataset.txt) loadText(e.target, docState.doc, +e.target.dataset.i, false);
 }), { root: document.getElementById('docview'), rootMargin: '600px 0px' });
-var measureCtx = document.createElement('canvas').getContext('2d');
-measureCtx.font = '100px Arial, Helvetica, sans-serif';
-async function loadText(d, doc, i, force) {
-  if (!doc || (d.dataset.txt && !force)) return;
-  d.dataset.txt = '1';
-  let t;
-  try { t = await (await fetch(`/api/text/${doc}/${i}`)).json(); } catch (e) { delete d.dataset.txt; return; }
-  if (!t.bounds || doc !== docState.doc) return;
-  d._text = t;
-  let layer = d.querySelector('.txt');
-  if (!layer) { layer = document.createElement('div'); layer.className = 'txt'; d.append(layer); }
-  layer.textContent = '';
-  if (!t.lines.length) return;
-  const [bx, by, bw, bh] = t.bounds, frag = document.createDocumentFragment();
-  t.lines.forEach((line, l) => line.forEach((wd, k) => {
-    const [x, y, w, h, txt] = wd, sp = document.createElement('span');
-    sp.textContent = txt + (k === line.length - 1 ? '\n' : ' ');
-    sp.dataset.l = l; sp.dataset.w = k;
-    const fs = h / bw * 100 * 0.88;                                  // taille de police en % de la largeur de page
-    const tw = measureCtx.measureText(txt).width / 100;              // largeur du mot pour une police de 1 px
-    sp.style.cssText = `left:${(x - bx) / bw * 100}%;top:${(y - by) / bh * 100}%;font-size:${fs}cqw;`
-                     + `transform:scaleX(${tw > 0 ? (w / (tw * h * 0.88)).toFixed(4) : 1})`;
-    frag.append(sp);
-  }));
-  layer.append(frag);
-}
-// sélection -> rectangles par ligne (unités de page)
-var selInfo = null;
-function readSelection() {
-  const sel = getSelection();
-  if (sel.isCollapsed || !sel.rangeCount) return null;
-  const n = sel.anchorNode && (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentNode);
-  const d = n && n.closest && n.closest('.docpage');
-  if (!d || !d._text) return null;
-  const byLine = new Map();
-  d.querySelectorAll('.txt span').forEach(sp => {
-    if (!sel.containsNode(sp, true)) return;
-    const l = +sp.dataset.l, [x, y, w, h] = d._text.lines[l][+sp.dataset.w];
-    const r = byLine.get(l);
-    if (!r) byLine.set(l, [x, y, x + w, y + h]);
-    else { r[0] = Math.min(r[0], x); r[1] = Math.min(r[1], y); r[2] = Math.max(r[2], x + w); r[3] = Math.max(r[3], y + h); }
-  });
-  if (!byLine.size) return null;
-  return { d, page: +d.dataset.i, text: sel.toString(),
-           rects: [...byLine.values()].map(r => [r[0], r[1], r[2] - r[0], r[3] - r[1]]) };
-}
-function hideSel(clear) { $('#selbar').hidden = true; selInfo = null; if (clear) getSelection().removeAllRanges(); }
-document.addEventListener('mouseup', e => {
-  if (e.target.closest && e.target.closest('#selbar')) return;
-  setTimeout(() => {
-    if (tool !== 'view') return;
-    selInfo = readSelection();
-    const bar = $('#selbar');
-    if (!selInfo) { bar.hidden = true; return; }
-    bar.hidden = false;
-    const bw = bar.offsetWidth, bh = bar.offsetHeight;
-    bar.style.left = Math.max(8, Math.min(e.clientX - bw / 2, innerWidth - bw - 8)) + 'px';
-    bar.style.top = (e.clientY + 14 + bh > innerHeight ? e.clientY - bh - 14 : e.clientY + 14) + 'px';
-  }, 0);
-});
-$('#docview').addEventListener('scroll', () => { if (!$('#selbar').hidden) hideSel(false); }, { passive: true });
 function argbHex(c) {                     // '#rrggbb' ou 'rgb(r,g,b)' -> ARGB opaque
   const m = c.match(/\d+/g);
   const v = c[0] === '#' ? parseInt(c.slice(1).padEnd(6, c.slice(1)), 16) : ((+m[0] << 16) | (+m[1] << 8) | +m[2]);
   return (0xFF000000 | v) >>> 0;
 }
-function showPending(info, kind, color) {
-  const [bx, by, bw, bh] = info.d._text.bounds;
-  for (const [x, y, w, h] of info.rects) {
-    const e = document.createElement('div'); e.className = 'pend ' + kind;
-    const top = kind === 'highlight' ? y : y + h * (kind === 'underline' ? 0.86 : 0.56) - 1.5, ht = kind === 'highlight' ? h : 3;
-    e.style.cssText = `left:${(x - bx) / bw * 100}%;top:${(top - by) / bh * 100}%;width:${w / bw * 100}%;height:${ht / bh * 100}%;background:${color}`;
-    info.d.append(e);
-  }
-  setTimeout(() => info.d.querySelectorAll('.pend').forEach(e => e.remove()), 20000);
-}
-async function annotate(kind, color) {
-  const info = selInfo;
-  if (!info) return;
-  hideSel(true);
+async function annotate(info, kind, color) {
+  color = color || penColor();                                       // souligner, barrer : couleur du crayon
   const label = { highlight: 'Surlignage', underline: 'Soulignement', strike: 'Barré' }[kind];
-  showPending(info, kind, color);
+  TextLayer.pending(info, kind, color);
   status(info.page !== docState.page ? `Ouverture de la page ${info.page + 1} sur la tablette…` : label + ' envoyé…', 0);
   const r = await post('/api/annot', { doc: docState.doc, page: info.page, kind, argb: argbHex(color), rects: info.rects });
   status(r.ok ? `${label} : ${info.rects.length} ligne${info.rects.length > 1 ? 's' : ''}, page ${info.page + 1}` : 'Échec : ' + (r.error || '?'));
   if (!r.ok) info.d.querySelectorAll('.pend').forEach(e => e.remove());
 }
-$('#selbar').addEventListener('mousedown', e => e.preventDefault());       // garder la sélection
-$('#selbar').addEventListener('click', e => {
-  const b = e.target.closest('button');
-  if (!b || !selInfo) return;
-  if (b.dataset.hl) return annotate('highlight', b.dataset.hl);
-  if (b.dataset.mk === 'copy') {
-    const t = selInfo.text.replace(/[ \t]+\n/g, '\n').trim();
-    navigator.clipboard.writeText(t).then(() => status('Texte copié'), () => status('Copie impossible'));
-    return hideSel(true);
-  }
-  annotate(b.dataset.mk, penColor());
-});
+TextLayer.init({ pages: '.docpage', index: d => +d.dataset.i, doc: () => docState.doc, enabled: () => tool === 'view',
+                 scroller: document.getElementById('docview'), annotate, notify: m => status(m) });
+const loadText = TextLayer.load;
 
 // ================================================================ zoom du Studio (indépendant de la tablette)
 var zoom = 1;
@@ -981,7 +877,7 @@ function setZoom(z, cx, cy) {                 // (cx, cy) : point de la vue qui 
   dv.scrollLeft = fx * dv.scrollWidth - cx; dv.scrollTop = fy * dv.scrollHeight - cy;
   try { localStorage.setItem('rm-studio-zoom', zoom); } catch (e) {}
   placeLive();
-  if (!$('#selbar').hidden) hideSel(false);
+  TextLayer.hide(false);
   clearTimeout(setZoom.t); setZoom.t = setTimeout(refreshHd, 400);
 }
 $('#zin').onclick = () => setZoom(zoom * 1.25);
@@ -1001,7 +897,7 @@ document.addEventListener('keydown', e => {
   if (e.key === '+' || e.key === '=') return setZoom(zoom * 1.25);
   if (e.key === '-') return setZoom(zoom / 1.25);
   if (e.key === '0') return setZoom(1);
-  if (e.key === 'Escape' && !$('#selbar').hidden) { hideSel(true); return; }
+  if (e.key === 'Escape' && TextLayer.info) { TextLayer.hide(true); return; }
   const k = { v: 'view', l: 'free', r: 'line', c: 'circle', e: 'ellipse', g: 'grid', p: 'polygon', f: 'formula' }[e.key.toLowerCase()];
   if (k) setTool(k);
   if (e.key === 'Enter' && tool === 'formula' && !fbox.hidden) { e.preventDefault(); placeFormula(); return; }

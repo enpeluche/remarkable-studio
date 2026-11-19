@@ -22,7 +22,7 @@ tester, et les règles à respecter. Pour le *pourquoi* technique (format, adres
 | `draw.py`, `formules.py` | dessin injecté, formules LaTeX → image |
 | `library.html` | bibliothèque (une page, sans dépendance) |
 | `studio.html` | Studio (une page, sans dépendance) |
-| `static/` | thème commun (`theme.css`, `theme.js`), police Inter, logo |
+| `static/` | thème commun (`theme.css`, `theme.js`), couche de texte des PDF et barre de sélection (`textlayer.js`, Studio et bibliothèque), police Inter, logo |
 
 ### Tablette (`tablette/`)
 

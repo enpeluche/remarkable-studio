@@ -47,6 +47,10 @@
   annotation recopiées telles quelles (texte, liens), encre en vectoriel par-dessus, page agrandie si l'encre
   déborde dans la marge ; pages de notes et carnets : pages blanches avec l'encre.
 
+- **Texte des PDF** (bibliothèque comme Studio) : sélectionner du texte à la souris → surligner (4 couleurs),
+  souligner, barrer (tracé sur la tablette, la page y est ouverte d'abord ; un document doit déjà être ouvert
+  sur la tablette) ou copier.
+
 ## Sur la tablette
 
 - **Menu du crayon** : sous les épaisseurs, un curseur continu ; à droite, « Couleurs libres » (palette partagée
