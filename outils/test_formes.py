@@ -72,8 +72,19 @@ def attendre(t, depuis, delai):
     return log, n
 
 
+def zone_page(vue, rect):
+    """Zone de l'écran physique [x, y, w, h] -> rectangle englobant dans la page (zoom, défilement, paysage)."""
+    ox, oy, ax, ay, bx, by = vue["map"]
+    pts = []
+    for px, py in ((rect[0], rect[1]), (rect[0] + rect[2], rect[1]), (rect[0], rect[1] + rect[3]),
+                   (rect[0] + rect[2], rect[1] + rect[3])):
+        pts.append((ox + (ax - ox) * px / 1404 + (bx - ox) * py / 1872, oy + (ay - oy) * px / 1404 + (by - oy) * py / 1872))
+    x0, y0 = min(p[0] for p in pts), min(p[1] for p in pts)
+    return [round(x0, 1), round(y0, 1), round(max(p[0] for p in pts) - x0, 1), round(max(p[1] for p in pts) - y0, 1)]
+
+
 def compter(t, rect, depuis):
-    t.commande({"action": "diag", "rect": rect})
+    t.commande({"action": "diag", "scene": zone_page(t.vue(), rect)})
     time.sleep(1.2)
     log = t.journal(depuis)
     m = re.findall(r"diag bas de page : (.*?) \| outil (\d+)", log)
@@ -98,7 +109,12 @@ def main():
     if v0["pageId"] != page:
         sys.exit(f"page affichée {v0['pageId']} ≠ page attendue {page}")
     outil0 = v0["pen"]["tool"]
-    print(f"page {page}, crayon {outil0}, correspondance {v0['map']}")
+    ox, oy, ax, ay, bx, by = v0["map"]
+    zoom = 1404 / max(1e-6, ((ax - ox) ** 2 + (ay - oy) ** 2) ** 0.5)
+    print(f"page {page}, crayon {outil0}, zoom {zoom:.2f}, angle {v0.get('angle')}, "
+          f"{'portrait' if v0.get('portrait') else 'paysage'}")
+    if v0.get("mask"):
+        print("(un Studio regarde : masque d'interface disponible)")
     if not a.garder_gabarits:
         t.commande({"action": "resetTemplates"})
         time.sleep(1)
@@ -122,6 +138,8 @@ def main():
         v = t.vue()
         if v["pageId"] != page:
             sys.exit(f"ARRÊT : la page affichée a changé ({v['pageId']})")
+        if v["map"] != v0["map"]:
+            sys.exit("ARRÊT : le zoom, le défilement ou l'orientation a changé pendant le test")
         avant, _ = compter(t, zone, t.maintenant() - 1)
         if avant:
             print(f"{nom:10s} zone déjà occupée ({avant} éléments) : ignorée")

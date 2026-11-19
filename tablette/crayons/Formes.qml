@@ -60,7 +60,9 @@ Item {
             commit();
         } else if (c.action === "diag") {
             // diagnostic en lecture seule
-            const r = view.tileManager.viewToScene(c.rect ? Qt.rect(c.rect[0], c.rect[1], c.rect[2], c.rect[3]) : Qt.rect(0, 1600, 1404, 272));
+            // c.scene : zone déjà dans le repère de la page ; c.rect : zone dans le repère de la vue
+            const r = c.scene ? Qt.rect(c.scene[0], c.scene[1], c.scene[2], c.scene[3])
+                    : view.tileManager.viewToScene(c.rect ? Qt.rect(c.rect[0], c.rect[1], c.rect[2], c.rect[3]) : Qt.rect(0, 1600, 1404, 272));
             log("diag vue status=" + view.status + " visible=" + view.visible + " page=" + (view.tileManager ? view.tileManager.pageId : "?") + " opacité=" + view.opacity);
             log("diag bas de page : " + rectsIn(r) + " | outil " + view.toolSettings.activePen.tool
                 + " | gabarits " + Object.keys(Etat.gabarits).join(", ") + " | zone " + tplArea + " attendu " + tplExpect);
