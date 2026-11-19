@@ -728,7 +728,7 @@ async function sendShape(d) {
   const body = { shape: d.t, ax: d.a[0], ay: d.a[1], bx: d.b[0], by: d.b[1], spacing: +$('#spacing').value, sides: +$('#sides').value };
   if (d.t === 'ellipse') body.minor = d.minor;
   const r = await post('/api/formes/build', body);
-  status(r.ok ? 'Forme envoyée' : 'Échec : ' + (r.error || 'tablette injoignable'));
+  status(r.ok ? 'Forme tracée' : 'Échec : ' + (r.error || 'tablette injoignable'));
 }
 const dv = $('#docview');
 dv.addEventListener('pointerdown', e => {

@@ -48,10 +48,26 @@ Item {
             if (c.id === f.lastId) return;
             f.lastId = c.id;
             if (Date.now() - c.id > 15000) return;               // trop ancienne
-            try { f.run(c); } catch (e) { f.log("erreur " + e); }
+            try { f.run(c); } catch (e) { f.log("erreur " + e); f.result(false, "erreur " + e); }
         }
     }
+    // Compte rendu de la commande en cours (marks, build) dans resultat.json : le PC l'attend pour répondre vrai.
+    property double cmdId: 0
+    function result(ok, msg) {
+        if (!cmdId) return;
+        const x = new XMLHttpRequest();
+        x.open("PUT", "file:///home/root/xovi/formes/resultat.json");
+        x.send(JSON.stringify({ id: cmdId, ok: ok, message: msg }));
+        log("résultat " + (ok ? "ok" : "échec") + " : " + msg);
+        cmdId = 0;
+    }
+    function fail(msg) {                            // échec d'une construction : style du crayon rendu, compte rendu
+        if (job) { restoreStyle(job); job = null; }
+        tplSkip = 0;
+        result(false, msg);
+    }
     function run(c) {
+        if (c.action === "marks" || c.action === "build") cmdId = c.id;
         if (c.action === "place") {
             spec = c; dragging = false; status = ""; ellipseStep = 0;
             log("placement " + c.shape);
@@ -224,7 +240,7 @@ Item {
     function commit() {
         const s = spec;
         spec = null;
-        if (!isWriting()) { status = "Choisissez d'abord un crayon"; clearMsg.restart(); return; }
+        if (!isWriting()) { status = "Choisissez d'abord un crayon"; clearMsg.restart(); result(false, "le crayon actif n'écrit pas (gomme, sélection)"); return; }
         const strokes = shapeStrokes(s, a, b);
         const job = { segs: [], ellipses: [], area: null, group: false };
         for (const st of strokes) {
@@ -244,8 +260,8 @@ Item {
     // largeur > 0 = bande (surligneur) obtenue par l'étirement perpendiculaire du gabarit.
     // Style imposé le temps de l'opération (c.pen), puis crayon de l'utilisateur restauré.
     function marks(c) {
-        if (c.page && String(view.tileManager.pageId) !== String(c.page)) { log("marks : autre page affichée"); return; }
-        if (!isWriting()) { status = "Choisissez d'abord un crayon"; clearMsg.restart(); return; }
+        if (c.page && String(view.tileManager.pageId) !== String(c.page)) { log("marks : autre page affichée"); result(false, "autre page affichée"); return; }
+        if (!isWriting()) { status = "Choisissez d'abord un crayon"; clearMsg.restart(); result(false, "le crayon actif n'écrit pas (gomme, sélection)"); return; }
         const p = view.toolSettings.activePen;
         const restore = { tool: p.tool, color: p.color, colorCode: p.colorCode >>> 0, thickness: p.thickness,
                           snap: p.snapHighlighterToText };
@@ -264,7 +280,7 @@ Item {
             x0 = Math.min(x0, g[0], g[2]); x1 = Math.max(x1, g[0], g[2]);
             y0 = Math.min(y0, g[1] - w / 2, g[3] - w / 2); y1 = Math.max(y1, g[1] + w / 2, g[3] + w / 2);
         }
-        if (!job.segs.length) { restoreStyle(job); return; }
+        if (!job.segs.length) { restoreStyle(job); result(false, "rien à tracer"); return; }
         job.area = Qt.rect(x0 - 10, y0 - 10, x1 - x0 + 20, y1 - y0 + 20);
         job.group = rectsIn(job.area) === "";
         log("marks : " + job.segs.length + " segments, outil " + p.tool);
@@ -315,6 +331,7 @@ Item {
     property real tplExpect: 0
     property int tplStep: 0
     property int savedTool: -1
+    property int tplSkip: 0                        // emplacements déjà essayés sans succès
     function makeTemplate(kind) {
         status = "Préparation du gabarit…";
         tplKind = kind;
@@ -332,7 +349,9 @@ Item {
             return true;
         };
         const spots = [];
-        for (const y of [1800, 160, 1600, 400, 1350, 650, 1100, 900])
+        // milieu de l'écran d'abord : aux bords apparaissent bandeau de titre (à l'ouverture d'un document) et menus,
+        // que le tracé simulé toucherait (constaté : gabarit jamais tracé)
+        for (const y of [1100, 900, 1350, 650, 1600, 400, 1800])
             for (const x of kind === "line" ? [150, 850, 500] : [1250, 150, 700, 1000, 400])
                 spots.push([x, y]);
         // le gabarit est tracé dans le repère de la PAGE (droite horizontale dans la page) : en paysage il est
@@ -342,7 +361,7 @@ Item {
         const k0 = layer.mapToItem(null, 0, 0), k1 = layer.mapToItem(null, 100, 0);
         const k = Math.max(0.05, Math.hypot(k1.x - k0.x, k1.y - k0.y) / 100);
         const lineLen = 400 / k, radius = 60 / k;
-        let box = null, L0 = null;
+        let box = null, L0 = null, skip = tplSkip;
         for (const sp of spots) {
             const Ls = layer.mapFromItem(null, sp[0], sp[1]);               // point de départ, repère de la page affichée
             let sx0, sy0, sx1, sy1;
@@ -354,9 +373,12 @@ Item {
             if (!uiFree(sx0, sy0, sx1 - sx0, sy1 - sy0)) continue;
             const A = layer.mapFromItem(null, sx0, sy0), B2 = layer.mapFromItem(null, sx1, sy1);
             const area = view.tileManager.viewToScene(Qt.rect(Math.min(A.x, B2.x), Math.min(A.y, B2.y), Math.abs(B2.x - A.x), Math.abs(B2.y - A.y)));
-            if (rectsIn(area) === "") { box = area; L0 = Ls; break; }
+            if (rectsIn(area) === "") {
+                if (skip-- > 0) continue;                  // nouvel essai : emplacement suivant
+                box = area; L0 = Ls; break;
+            }
         }
-        if (!box) { status = "Pas de place libre pour le gabarit"; clearMsg.restart(); job = null; return; }
+        if (!box) { status = "Pas de place libre pour le gabarit"; clearMsg.restart(); fail("pas de place libre pour le gabarit"); return; }
         tplArea = box;
         const pts = [];      // repère de la page affichée (inject() convertit vers l'écran physique)
         if (kind === "line") {
@@ -397,8 +419,11 @@ Item {
                 m = found;
                 const ok = m !== null;
                 if (!ok) {
-                    if (++tries > 100) { stop(); f.status = "Gabarit introuvable"; f.log("gabarit introuvable " + r);
-                                         if (f.job) { f.restoreStyle(f.job); f.job = null; } }
+                    if (++tries > 100) {
+                        stop(); f.log("gabarit introuvable " + r);
+                        if (f.tplSkip < 2 && f.job) { f.tplSkip++; f.log("nouvel essai, autre emplacement"); f.makeTemplate(f.tplKind); }
+                        else { f.status = "Gabarit introuvable"; f.fail("gabarit introuvable"); }
+                    }
                     return;
                 }
                 f.tplMeasure = +m[3];
@@ -415,7 +440,7 @@ Item {
                     if (++tries > 60) { stop(); f.status = "Sélection du gabarit impossible";
                                         f.log("sélection du gabarit : " + ctl.selectionItemCount + " élément(s) " + f.rectsIn(f.tplArea));
                                         ctl.clearSelectedItems(); f.restoreTool(f.savedTool);
-                                         if (f.job) { f.restoreStyle(f.job); f.job = null; } }
+                                        f.fail("sélection du gabarit impossible"); }
                     return;
                 }
                 const items = ctl.cloneSelectedItems(L, f.view.defaultScale);
@@ -429,6 +454,7 @@ Item {
                 const size = Math.max(1, f.tplMeasure - f.tplThick);
                 Etat.gabarits[f.tplKind + "2|" + f.styleKey()] = { items: items, size: size, thick: f.tplThick };
                 f.log("gabarit " + f.tplKind + " prêt, taille " + size.toFixed(1));
+                f.tplSkip = 0;
                 if (f.job) { const j = f.job; f.job = null; f.run2(j); }
             }
         }
@@ -482,7 +508,7 @@ Item {
             grouped = true;
         }
         } finally {
-            if (!grouped) { restoreTool(saved); status = ""; restoreStyle(j); }
+            if (!grouped) { restoreTool(saved); status = ""; restoreStyle(j); result(steps > 0, steps + " élément(s)"); }
         }
     }
 
@@ -584,7 +610,7 @@ Item {
             }
         }
         function abandon(why) { stop(); f.log("regroupement abandonné : " + why); finish(); }
-        function finish() { f.restoreTool(saved); f.status = ""; f.restoreStyle(job); }
+        function finish() { f.restoreTool(saved); f.status = ""; f.restoreStyle(job); f.result(true, steps + " élément(s)"); }
     }
 
     // ---- injection (gabarits)

@@ -769,7 +769,9 @@ class Handler(BaseHTTPRequestHandler):
                         if st.get("doc") == doc and st.get("page") == n:
                             break
                     else:
-                        return self.json({"ok": False, "error": "impossible d'ouvrir la page sur la tablette"})
+                        return self.json({"ok": False, "error": "impossible d'ouvrir la page sur la tablette (un document doit y être ouvert)"})
+                    # page tout juste ouverte : bandeau de titre et rendu en cours, laisser l'affichage se stabiliser
+                    time.sleep(1.5)
                 argb = int(body.get("argb") or 0) & 0xFFFFFFFF
                 segs = []
                 for x, y, w, h in rects:
@@ -783,7 +785,8 @@ class Handler(BaseHTTPRequestHandler):
                 cmd = {"action": "marks", "page": it["pages"][n]["id"], "pen": pen,
                        "segs": [[round(v, 2) for v in sg] for sg in segs]}
                 self.screen.boost(4)
-                return self.json({"ok": tablet.formes_cmd(cmd)})
+                ok, msg = tablet.formes_run(cmd)              # attend le compte rendu de la tablette
+                return self.json({"ok": ok, "message": msg} if ok else {"ok": False, "error": msg})
             if path == "/api/formes/build":
                 shape = body.get("shape")
                 if shape not in ("line", "rect", "circle", "ellipse", "grid", "polygon", "axes"):
@@ -795,7 +798,8 @@ class Handler(BaseHTTPRequestHandler):
                 if body.get("minor") is not None:              # ellipse : petit rayon (px)
                     cmd["minor"] = min(max(float(body["minor"]), 1), 2000)
                 self.screen.boost(4)
-                return self.json({"ok": tablet.formes_cmd(cmd)})
+                ok, msg = tablet.formes_run(cmd)              # attend le compte rendu de la tablette
+                return self.json({"ok": ok, "message": msg} if ok else {"ok": False, "error": msg})
             if path in ("/api/latex/render", "/api/latex/send"):
                 latex = str(body.get("latex") or "")
                 display = bool(body.get("display", True))

@@ -49,6 +49,7 @@ de l'image en direct du Studio, avec seuils).
 | tablette → PC | `/home/root/xovi/formes/vue.json` | page affichée, orientation, correspondance écran → page, masque d'interface, crayon |
 | PC → tablette | `/home/root/xovi/crayons/formes-cmd.json` | commandes (`build`, `place`, `marks`, `pen`, `image`, `placeImage`, `zoomFit`, `open`, `linksReload`, `cancel` ; mise au point : `diag`,
 `zoomInfo`, `deleteArea`, `resetTemplates`), id croissant |
+| tablette → PC | `/home/root/xovi/formes/resultat.json` | compte rendu de la dernière construction (`marks`, `build`) : `{id, ok, message}` ; le PC l'attend (`tablet.formes_run`) avant de répondre |
 | PC ← tablette | `/dev/input/event1` (lecture) | stylet, survol compris |
 | PC ← tablette | `/proc/<pid>/mem` de xochitl | image de l'écran |
 | PC → tablette | `http://10.11.99.1/upload` | envoi de fichiers (interface web USB officielle) |

@@ -129,10 +129,31 @@ def set_palette(palette):
 FORMES_CMD = "/home/root/xovi/crayons/formes-cmd.json"
 
 
-def formes_cmd(cmd):
+def formes_cmd(cmd, _id=None):
     """Écrit une commande pour Formes.qml (accroche dans la page affichée), ex. {"action": "build", ...}.
     Écriture atomique (fichier temporaire puis renommage) : Formes.qml relit le fichier toutes les 0,4 s."""
-    cmd = dict(cmd, id=int(time.time() * 1000))
+    cmd = dict(cmd, id=_id or int(time.time() * 1000))
     r = subprocess.run(["ssh", *SSH_OPTS, RM_HOST, f"cat > {FORMES_CMD}.tmp && mv {FORMES_CMD}.tmp {FORMES_CMD}"],
                        input=json.dumps(cmd).encode(), capture_output=True, timeout=10)
     return r.returncode == 0
+
+
+FORMES_RESULT = "/home/root/xovi/formes/resultat.json"
+
+
+def formes_run(cmd, timeout=45):
+    """Commande de construction (marks, build) puis attente de son compte rendu, écrit par Formes.qml dans
+    resultat.json : (True, message) / (False, raison). Le gabarit éventuel (injection) prend jusqu'à ~30 s."""
+    cid = int(time.time() * 1000)
+    if not formes_cmd(cmd, cid):
+        return False, "tablette injoignable"
+    end = time.time() + timeout
+    while time.time() < end:
+        time.sleep(0.7)
+        try:
+            r = json.loads(ssh(f"cat {FORMES_RESULT} 2>/dev/null", timeout=8).stdout or b"{}")
+        except (ValueError, subprocess.TimeoutExpired):
+            continue
+        if r.get("id") == cid:
+            return bool(r.get("ok")), r.get("message", "")
+    return False, "pas de réponse de la tablette (aucun document ouvert ?)"

@@ -194,3 +194,6 @@ entrée (`… & P=$!; read _; kill $P`), sinon elles s'accumulent.
   `carnetsReload` sont écrits dans `/run/xovi-mb` sans erreur mais n'atteignent jamais le QML (aucune trace dans le
   journal). Parade sans redémarrage : un QML rechargeable à chaud (`Formes.qml`) parcourt l'arbre de l'interface et
   appelle directement `onOpened({documentId, page})` de la vue principale, ou `reload()` du bouton des carnets liés.
+- **Tracé simulé juste après l'ouverture d'un document** : la tablette affiche un moment un bandeau de titre en
+  haut de l'écran ; un trait injecté là touche l'interface, pas la page (gabarit jamais tracé). Laisser ~1,5 s à
+  l'affichage, tracer les gabarits au milieu de l'écran, et réessayer à un autre emplacement.
