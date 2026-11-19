@@ -382,7 +382,13 @@ async function refreshDoc(force) {
   box.querySelectorAll('.docpage').forEach(d => d.classList.toggle('cur', +d.dataset.i === s.page));
   if (scroll) { const c = box.querySelector('.docpage.cur'); if (c) c.scrollIntoView({ block: 'center' }); }
 }
-setInterval(() => refreshDoc(false), 1000);
+// onglet caché : plus aucune interrogation (la capture d'écran du serveur, et donc la tablette, se mettent au repos)
+setInterval(() => { if (!document.hidden) refreshDoc(false); }, 1000);
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) return;
+  if (typeof lastFrameAt !== 'undefined' && lastFrameAt) lastFrameAt = Date.now();   // pas d'alerte « image figée » au retour
+  refreshDoc(false);
+});
 refreshDoc(true);
 
 // ---- fusion : l'écran en direct posé sur la zone que la tablette affiche, le reste = pages enregistrées
@@ -569,6 +575,7 @@ new ResizeObserver(() => placeLive()).observe($('#docview'));
 let seq = 0, lastFrameAt = 0, frames = [];
 async function screenLoop() {
   for (;;) {
+    if (document.hidden) { await new Promise(res => setTimeout(res, 1000)); continue; }
     try {
       const r = await fetch('/api/screen/next?after=' + seq, { cache: 'no-store' });
       if (r.status === 200) {
@@ -691,7 +698,7 @@ async function loadPalette() {
     }
   } catch (e) {}
 }
-readPen(); loadPalette(); setInterval(readPen, 4000);
+readPen(); loadPalette(); setInterval(() => { if (!document.hidden) readPen(); }, 4000);
 
 // ================================================================ formes, dessin libre, formule (souris sur l'écran)
 var dctx = $('#draft').getContext('2d');
@@ -1211,7 +1218,7 @@ $('#ncopy').onclick = () => {
 };
 document.querySelector('[data-panel="pNotes"]').addEventListener('click', () => setTimeout(() => { renderNotesPanel(); loadAnn(true); }, 0));
 setInterval(() => {
-  if (docState.doc && ann.doc !== docState.doc) { loadAnn(true); closeFind(); }
+  if (!document.hidden && docState.doc && ann.doc !== docState.doc) { loadAnn(true); closeFind(); }
 }, 1500);
 setInterval(() => { if (docState.doc && !document.hidden) loadAnn(true); }, 20000);   // pages réenregistrées par la tablette
 

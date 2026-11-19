@@ -119,11 +119,6 @@ Item {
         for (let i = 0; i < ch.length; i++) { const r = findByName(ch[i], name, depth + 1); if (r) return r; }
         return null;
     }
-    function eraserButton() {
-        let top = q;
-        while (top.parent) top = top.parent;
-        return findByName(top, "eraserMenu", 0);
-    }
     function eraserMenu() {                   // fenêtre « gomme » (types, épaisseur, tout effacer)
         menuOpen = !menuOpen;
     }

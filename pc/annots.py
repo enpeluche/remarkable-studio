@@ -27,11 +27,6 @@ def norm(s):
     return "".join(c for c in s if not unicodedata.combining(c))
 
 
-def _bounds(renderer, uid, n):
-    t = renderer.page_text(uid, n)
-    return t["bounds"] if t else None
-
-
 def search(lib, renderer, uid, query, limit=500):
     item = lib.snapshot().get(uid)
     q = " ".join(norm(query).split())
@@ -195,7 +190,7 @@ def document_annotations(lib, renderer, uid, with_bounds=False, cached_only=Fals
             key.write_text(json.dumps(entry, ensure_ascii=False))
         if entry["items"] or entry["ink"]:
             # dimensions d'affichage (rendu de la page : coûteux) seulement pour le Studio
-            res.append({"page": n, "bounds": _bounds(renderer, uid, n) if with_bounds else None, **entry})
+            res.append({"page": n, "bounds": renderer.page_bounds(uid, n) if with_bounds else None, **entry})
     return res
 
 

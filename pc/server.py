@@ -330,6 +330,51 @@ def _parse_bbox_pages(xml):
     return pages
 
 
+def _touch(path):
+    """Date d'utilisation d'un fichier du cache (pour retirer les moins utilisés en premier)."""
+    try:
+        os.utime(path)
+    except OSError:
+        pass
+
+
+def prune_cache(cache: Path, limit=300 << 20, target=200 << 20):
+    """Cache limité : au-delà de `limit` octets, retire les rendus (SVG, PNG : recalculables) les moins récemment
+    utilisés jusqu'à `target`. Le texte extrait et les annotations (petits, plus longs à refaire) sont gardés."""
+    files = []
+    total = 0
+    for f in cache.iterdir():
+        try:
+            st = f.stat()
+        except OSError:
+            continue
+        total += st.st_size
+        if f.suffix in (".svg", ".png"):
+            files.append((st.st_mtime, st.st_size, f))
+    if total <= limit:
+        return 0
+    removed = 0
+    recent = time.time() - 600                    # utilisés il y a moins de 10 min : peut-être en cours de lecture
+    for mtime, size, f in sorted(files):
+        if total <= target or mtime > recent:
+            break
+        f.unlink(missing_ok=True)
+        total -= size
+        removed += 1
+    return removed
+
+
+def _prune_loop(cache):
+    while True:
+        try:
+            n = prune_cache(cache)
+            if n:
+                print(f"cache : {n} rendus anciens retirés", flush=True)
+        except Exception as e:
+            print(f"cache : nettoyage impossible ({e})", flush=True)
+        time.sleep(1800)
+
+
 class Renderer:
     def __init__(self, lib: Library, cache: Path):
         self.lib = lib
@@ -345,7 +390,9 @@ class Renderer:
     def pdf_png(self, uid, idx, dpi=110):
         pdf = self.lib.root / f"{uid}.pdf"
         dst = self.cache / f"{uid}-p{idx}-{dpi}.png"
-        if not dst.exists() and pdf.exists():
+        if dst.exists():
+            _touch(dst)
+        elif pdf.exists():
             with self._lock(str(dst)):
                 if not dst.exists():
                     tmp = dst.with_suffix("")
@@ -354,8 +401,8 @@ class Renderer:
                                    capture_output=True, timeout=120)
         return dst if dst.exists() else None
 
-    def page_svg(self, uid, n, hd=1):
-        """hd = 1 : PDF rendu à la résolution de la tablette (227 dpi) ; 2 : double (Studio zoomé, écran haute densité)."""
+    def _svg_path(self, uid, n, hd):
+        """(fichier du cache, document, page, .rm) de la page rendue ; None si la page n'existe pas."""
         item = self.lib.snapshot().get(uid)
         if not item or n < 0 or n >= len(item["pages"]):
             return None
@@ -363,8 +410,30 @@ class Renderer:
         rm = self.lib.root / uid / f"{page['id']}.rm" if page["id"] else None
         sig = hashlib.sha1(json.dumps([page, rm.stat().st_mtime if rm and rm.exists() else 0,
                                        item["modified"], 8, hd]).encode()).hexdigest()[:12]
-        dst = self.cache / f"{uid}-{n}-h{hd}-{sig}.svg"
+        return self.cache / f"{uid}-{n}-h{hd}-{sig}.svg", item, page, rm
+
+    def page_bounds(self, uid, n):
+        """Dimensions de la page rendue [x, y, w, h] (unités de page) : lit seulement l'en-tête du rendu en cache
+        (un rendu pèse ~400 Ko ; le Studio demande ces dimensions pour chaque page annotée)."""
+        p = self._svg_path(uid, n, 1)
+        if not p:
+            return None
+        if p[0].exists():
+            with open(p[0], "rb") as f:
+                head = f.read(400)
+        else:
+            head = (self.page_svg(uid, n) or b"")[:400]
+        vb = re.search(rb'viewBox="([-\d.]+) ([-\d.]+) ([-\d.]+) ([-\d.]+)"', head)
+        return [round(float(v) / SCALE, 2) for v in vb.groups()] if vb else None
+
+    def page_svg(self, uid, n, hd=1):
+        """hd = 1 : PDF rendu à la résolution de la tablette (227 dpi) ; 2 : double (Studio zoomé, écran haute densité)."""
+        p = self._svg_path(uid, n, hd)
+        if not p:
+            return None
+        dst, item, page, rm = p
         if dst.exists():
+            _touch(dst)
             return dst.read_bytes()
         with self._lock(str(dst)):
             if dst.exists():
@@ -407,10 +476,7 @@ class Renderer:
         if not item or n < 0 or n >= len(item["pages"]):
             return None
         page = item["pages"][n]
-        svg = self.page_svg(uid, n) or b""
-        vb = re.search(rb'viewBox="([-\d.]+) ([-\d.]+) ([-\d.]+) ([-\d.]+)"', svg[:400])
-        bounds = [round(float(v) / SCALE, 2) for v in vb.groups()] if vb else None
-        out = {"bounds": bounds, "lines": []}
+        out = {"bounds": self.page_bounds(uid, n), "lines": []}
         pdf = self.lib.root / f"{uid}.pdf"
         rm = self.lib.root / uid / f"{page['id']}.rm" if page["id"] else None
         if item["type"] != "pdf" or page["redir"] is None or not pdf.exists():
@@ -478,7 +544,10 @@ class Handler(BaseHTTPRequestHandler):
         if self.command != "HEAD":
             self.wfile.write(body)
 
+    last_request = 0.0                  # dernière requête d'une page (rythme de la synchro automatique)
+
     def do_GET(self):
+        Handler.last_request = time.time()
         path = urllib.parse.urlparse(self.path).path
         parts = [p for p in path.split("/") if p]
         try:
@@ -621,6 +690,7 @@ class Handler(BaseHTTPRequestHandler):
                          {"Cache-Control": "no-store"})
 
     def do_POST(self):
+        Handler.last_request = time.time()
         # en-tête personnalisé obligatoire : un autre site ne peut pas l'envoyer sans pré-vérification CORS
         if self.headers.get("X-RM-Viewer") != "1":
             return self.send(403, b"forbidden", "text/plain")
@@ -804,9 +874,10 @@ def main():
     Handler.pen = live.PenStream()
     Handler.screen = screen.ScreenStream(Handler.pen)
     Handler.current = live.CurrentPage(lib, Path(a.data))
-    Handler.sync = autosync.AutoSync(lib, Path(a.data))
+    Handler.sync = autosync.AutoSync(lib, Path(a.data), active=lambda: time.time() - Handler.last_request < 120)
     Handler.autohl = autohl.AutoHighlighter(Handler.pen, Handler.current, Handler.renderer)
     threading.Thread(target=annots.warm_up, args=(lib, Handler.renderer), daemon=True).start()
+    threading.Thread(target=_prune_loop, args=(Handler.renderer.cache,), daemon=True).start()
     srv = ThreadingHTTPServer(("127.0.0.1", a.port), Handler)
     url = f"http://127.0.0.1:{a.port}/"
     print(f"{len(lib.items)} éléments chargés — {url}", flush=True)

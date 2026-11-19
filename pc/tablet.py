@@ -92,21 +92,6 @@ def set_link(lib_items, a, b):
     return links
 
 
-def refresh_names(lib_items):
-    links = load_links()
-    changed = False
-    for src, l in list(links.items()):
-        if src not in lib_items or l["to"] not in lib_items:
-            continue
-        name = lib_items[l["to"]]["name"]
-        if l.get("name") != name:
-            l["name"] = name
-            changed = True
-    if changed:
-        _save_links(links)
-    return links
-
-
 def push_links():
     """Copie les liens sur la tablette puis demande au bouton de les relire."""
     data = json.dumps({"links": load_links()}, ensure_ascii=False).encode()
@@ -121,37 +106,6 @@ def push_links():
 
 TABLET_PALETTE = "/home/root/crayons.json"
 PALETTE_FILE = HERE / "crayons.json"     # copie locale (la tablette fait foi quand elle est connectée)
-
-
-def request(name, value=""):
-    """Signal avec réponse : la réponse de l'interface est lue dans /run/xovi-mb-out."""
-    msg = shlex.quote(f">u{name}:{value}")
-    cmd = (f"[ -p {PIPE} ] || exit 3; "
-           f"timeout 3 cat {PIPE}-out > /tmp/rmv-resp & "
-           f"sleep 0.1; echo {msg} | timeout 3 tee {PIPE} >/dev/null; wait; cat /tmp/rmv-resp; rm -f /tmp/rmv-resp")
-    r = ssh(cmd, timeout=12)
-    if r.returncode == 3:
-        return None
-    return r.stdout.decode().strip()
-
-
-def pen_state():
-    out = request("penGet")
-    if not out:
-        return None
-    try:
-        return json.loads(out.splitlines()[-1])
-    except Exception:
-        return {"raw": out}
-
-
-def pen_set(fields):
-    clean = {k: fields[k] for k in ("argb", "thickness", "tool") if fields.get(k) is not None}
-    out = request("penSet", json.dumps(clean))
-    try:
-        return json.loads(out.splitlines()[-1]) if out else None
-    except Exception:
-        return {"raw": out}
 
 
 def get_palette():
@@ -177,10 +131,13 @@ def set_palette(palette):
     return r.returncode == 0
 
 
+FORMES_CMD = "/home/root/xovi/crayons/formes-cmd.json"
+
+
 def formes_cmd(cmd):
-    """Écrit une commande pour Formes.qml (accroche dans la page affichée), ex. {"action": "build", ...}."""
-    import time as _t
-    cmd = dict(cmd, id=int(_t.time() * 1000))
-    r = subprocess.run(["ssh", *SSH_OPTS, RM_HOST, "cat > /home/root/xovi/crayons/formes-cmd.json"],
+    """Écrit une commande pour Formes.qml (accroche dans la page affichée), ex. {"action": "build", ...}.
+    Écriture atomique (fichier temporaire puis renommage) : Formes.qml relit le fichier toutes les 0,4 s."""
+    cmd = dict(cmd, id=int(time.time() * 1000))
+    r = subprocess.run(["ssh", *SSH_OPTS, RM_HOST, f"cat > {FORMES_CMD}.tmp && mv {FORMES_CMD}.tmp {FORMES_CMD}"],
                        input=json.dumps(cmd).encode(), capture_output=True, timeout=10)
     return r.returncode == 0

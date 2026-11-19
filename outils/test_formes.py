@@ -45,7 +45,7 @@ class Tablette:
 
     def commande(self, c):
         c = dict(c, id=int(time.time() * 1000))
-        self.run(f"cat > {CMD} <<'EOF'\n{json.dumps(c)}\nEOF")
+        self.run(f"cat > {CMD}.tmp <<'EOF'\n{json.dumps(c)}\nEOF\nmv {CMD}.tmp {CMD}")
 
     def journal(self, depuis):
         return self.run(f"journalctl -u xochitl --since '@{depuis:.0f}' --no-pager -o cat | grep FORMES")

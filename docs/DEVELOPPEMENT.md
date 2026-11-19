@@ -38,7 +38,8 @@ tester, et les règles à respecter. Pour le *pourquoi* technique (format, adres
 ### Outils (`outils/`)
 
 `installer.sh`, `desinstaller.sh`, `diagnostic.sh` (état complet en une connexion), `patch_couleurs.py`,
-`extraire_qml.py` (étudier le QML d'une nouvelle version), `test_formes.py` (test complet des formes sur la tablette).
+`extraire_qml.py` (étudier le QML d'une nouvelle version), `test_formes.py` (test complet des formes sur la tablette), `test_perf.py` (temps de réponse du serveur, coût
+de l'image en direct du Studio, avec seuils).
 
 ## Échanges PC ↔ tablette (tous par SSH)
 
@@ -72,7 +73,7 @@ Lecture : `/` (bibliothèque), `/studio`, `/api/library`, `/api/library/version`
 | Chemin | Contenu |
 |---|---|
 | `pc/xochitl/` | sauvegarde des documents (synchro auto) |
-| `pc/.cache/` | pages rendues (SVG), PNG des PDF, texte extrait (`*-p<i>-text.json`), annotations par page (`*-annots2-<mtime>.json`), formules |
+| `pc/.cache/` | pages rendues (SVG), PNG des PDF, texte extrait (`*-p<i>-text.json`), annotations par page (`*-annots2-<mtime>.json`), formules. Limité à 300 Mo : les rendus les moins récemment utilisés sont retirés (toutes les 30 min) |
 | `pc/notes.json` | commentaires des surlignages |
 | `pc/reglages.json` | réglages (surligneur auto) |
 | `pc/tablette.conf`, `pc/.ssh_config` | adresse Wi-Fi, configuration SSH générée |
@@ -96,11 +97,22 @@ Changer le format d'un cache : changer son nom (ex. `annots2`) pour que l'ancien
 - **Pages web** : Chromium sans interface piloté par le protocole DevTools (`--remote-debugging-port`), évaluer
   du JavaScript dans la page, capturer l'écran. Désactiver le cache (`Network.setCacheDisabled`) : `/static`
   est servi avec `max-age=300`, et le Chromium « snap » ignore `--user-data-dir` hors de son dossier.
+- **Performance** : `python outils/test_perf.py` (serveur lancé) : routes < 300 ms, page en cache < 150 ms,
+  image en direct du Studio < 40 ms. À relancer après toute modification du Studio ou du serveur.
 - **Formes** : `python outils/test_formes.py --effacer` avec une page de TEST ouverte, stylet éloigné : construit
   les 7 formes (gabarits compris), vérifie chacune dans la page, le regroupement et le crayon rendu. À relancer
   après toute modification de `Formes.qml`, `Quad.qml` ou `PenMenu.qml` (ils partagent le crayon actif).
 - **Tablette** : `outils/diagnostic.sh` ; journal : `journalctl -u xochitl -f` (les messages de `Formes.qml`
   commencent par `FORMES`). Avant d'injecter des traits de test, vérifier le document et la page ouverts.
+
+## Sobriété (ce qui tourne en continu)
+
+- Studio : état de la page 1×/s, crayon toutes les 4 s, capture de l'écran pilotée par les événements ; **rien
+  quand l'onglet est caché** (la capture du serveur s'arrête 15 s après la dernière demande).
+- Synchro de la sauvegarde : toutes les 10 s quand une page du PC sert, sinon toutes les 60 s (~0,3 s de
+  processeur de la tablette par passage).
+- Tablette : `Formes.qml` relit le fichier de commandes toutes les 0,4 s et écrit `vue.json` toutes les 0,7 s
+  (Studio ouvert) ou 1,5 s.
 
 ## Règles
 

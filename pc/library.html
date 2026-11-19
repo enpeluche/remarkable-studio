@@ -474,7 +474,7 @@ async function pollTablet() {
   $('#tabstart').hidden = !(tab.usb && !tab.mods);
   $('#vtab').disabled = !tab.mods;
   $('#vtab').title = tab.mods ? 'Ouvrir ce document sur la tablette, à cette page' : 'Indisponible : ' + (tab.usb ? 'active les modifs de la tablette' : 'tablette non connectée');
-  setTimeout(pollTablet, 8000);
+  setTimeout(pollTablet, document.hidden ? 30000 : 8000);     // onglet caché : bien plus espacé
 }
 $('#tabstart').onclick = async () => {
   const b = $('#tabstart'); b.disabled = true; b.textContent = 'Redémarrage…';

@@ -16,10 +16,14 @@ MARK = "/tmp/rmv-sync-mark"
 
 
 class AutoSync:
-    def __init__(self, lib, local_root, interval=10):
+    def __init__(self, lib, local_root, interval=10, idle_interval=60, active=None):
+        """active() -> True si une page du PC sert en ce moment : synchro toutes les `interval` s, sinon toutes les
+        `idle_interval` s (chaque passage coûte ~0,3 s de processeur à la tablette)."""
         self.lib = lib
         self.root = local_root
         self.interval = interval
+        self.idle_interval = idle_interval
+        self.active = active or (lambda: True)
         self.version = 0                 # change à chaque document mis à jour (la bibliothèque se rafraîchit)
         self.last = {"t": 0, "files": 0, "docs": 0, "error": None, "full": False}
         self.lock = threading.Lock()
@@ -63,4 +67,8 @@ class AutoSync:
                 self.last.update(t=time.time(), error=None)
             except Exception as e:
                 self.last["error"] = str(e)
-            time.sleep(self.interval)
+            # attente découpée : reprend le rythme rapide dès qu'une page du PC redevient active
+            end = time.time() + self.idle_interval
+            start = time.time()
+            while time.time() < end and not (self.active() and time.time() - start >= self.interval):
+                time.sleep(1)
