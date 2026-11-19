@@ -7,3 +7,5 @@
 - Ne jamais rendre xovi persistant ; prévenir avant tout redémarrage de l'interface (PIN demandé).
 - Vérifier le document et la page ouverts avant d'injecter des traits de test sur la tablette.
 - Ne jamais committer de données personnelles (sauvegarde, notes.json, tablette.conf…) ni de fichiers de reMarkable.
+- Après toute modification du QML de la tablette : `outils/test_formes.py --effacer` sur une page de test.
+  Le crayon actif est `toolSettings.activePen` (le bouton 4 cases active le crayon secondaire, pas `primaryPen`).

@@ -38,7 +38,7 @@ tester, et les règles à respecter. Pour le *pourquoi* technique (format, adres
 ### Outils (`outils/`)
 
 `installer.sh`, `desinstaller.sh`, `diagnostic.sh` (état complet en une connexion), `patch_couleurs.py`,
-`extraire_qml.py` (étudier le QML d'une nouvelle version).
+`extraire_qml.py` (étudier le QML d'une nouvelle version), `test_formes.py` (test complet des formes sur la tablette).
 
 ## Échanges PC ↔ tablette (tous par SSH)
 
@@ -96,6 +96,9 @@ Changer le format d'un cache : changer son nom (ex. `annots2`) pour que l'ancien
 - **Pages web** : Chromium sans interface piloté par le protocole DevTools (`--remote-debugging-port`), évaluer
   du JavaScript dans la page, capturer l'écran. Désactiver le cache (`Network.setCacheDisabled`) : `/static`
   est servi avec `max-age=300`, et le Chromium « snap » ignore `--user-data-dir` hors de son dossier.
+- **Formes** : `python outils/test_formes.py --effacer` avec une page de TEST ouverte, stylet éloigné : construit
+  les 7 formes (gabarits compris), vérifie chacune dans la page, le regroupement et le crayon rendu. À relancer
+  après toute modification de `Formes.qml`, `Quad.qml` ou `PenMenu.qml` (ils partagent le crayon actif).
 - **Tablette** : `outils/diagnostic.sh` ; journal : `journalctl -u xochitl -f` (les messages de `Formes.qml`
   commencent par `FORMES`). Avant d'injecter des traits de test, vérifier le document et la page ouverts.
 
