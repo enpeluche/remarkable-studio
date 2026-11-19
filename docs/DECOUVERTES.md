@@ -77,7 +77,7 @@ style d'une sélection. Mais le contrôleur de la page (`SceneController`, `view
 
 | Fonction | Usage |
 |---|---|
-| `addSelectionRect(rectPage, 1)` | sélectionner (seulement si `primaryPen.tool = Line.SelectionTool`) |
+| `addSelectionRect(rectPage, 1)` | sélectionner (seulement si le crayon **actif** — `toolSettings.activePen`, qui n'est pas toujours `primaryPen` — est `Line.SelectionTool` ; asynchrone : relire `selectionItemCount` ensuite) |
 | `cloneSelectedItems(calque, defaultScale)` | copier la sélection → liste de traits (comme le presse-papiers) |
 | `cloneAddAndSelectItems(calque, traits, 1/defaultScale, centre)` | coller **centré** sur un point de la page |
 | `scaleSelectedItems(calque, origine, sx, sy)` | étirer |

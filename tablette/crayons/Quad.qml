@@ -68,6 +68,8 @@ Item {
         onTriggered: {
             const p = q.tool ? q.tool.pen : null;
             if (!p || q.current < 0 || q.active !== q.tool) return;
+            // outils temporaires (Formes passe le crayon actif en Sélection le temps d'une opération)
+            if (p.tool === Line.SelectionTool || p.tool === Line.Eraser || p.tool === Line.EraseSection || p.tool === Line.ZoomTool) return;
             const s = { tool: p.tool, color: p.color, colorCode: p.colorCode >>> 0, thickness: p.thickness };
             const o = q.slots[q.current];
             if (o && o.tool === s.tool && o.color === s.color && (o.colorCode >>> 0) === s.colorCode && o.thickness === s.thickness) return;
