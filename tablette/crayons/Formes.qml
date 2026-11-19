@@ -58,15 +58,6 @@ Item {
             // coordonnées reçues = écran physique (image de l'écran) -> repère de la page (tourné en paysage)
             spec = c; a = layer.mapFromItem(null, c.ax, c.ay); b = layer.mapFromItem(null, c.bx, c.by);   // (minor : longueur, inchangée)
             commit();
-        } else if (c.action === "diag") {
-            // diagnostic en lecture seule
-            const r = view.tileManager.viewToScene(c.rect ? Qt.rect(c.rect[0], c.rect[1], c.rect[2], c.rect[3]) : Qt.rect(0, 1600, 1404, 272));
-            log("diag vue status=" + view.status + " visible=" + view.visible + " page=" + (view.tileManager ? view.tileManager.pageId : "?") + " opacité=" + view.opacity);
-            log("diag bas de page : " + rectsIn(r) + " | outil " + view.toolSettings.activePen.tool
-                + " | gabarits " + Object.keys(Etat.gabarits).join(", ") + " | zone " + tplArea + " attendu " + tplExpect);
-        } else if (c.action === "tool") {
-            view.toolSettings.activePen.tool = c.tool;
-            log("outil remis à " + view.toolSettings.activePen.tool);
         } else if (c.action === "pen") {
             setPen(c);
         } else if (c.action === "marks") {
@@ -83,13 +74,6 @@ Item {
             // formule (image) envoyée par le PC : on touche l'endroit où la poser
             spec = { shape: "image", file: c.file, w: c.w, h: c.h }; dragging = false; status = "";
             log("placement image " + c.file);
-        } else if (c.action === "deleteArea") {
-            const A = layer.mapFromItem(null, c.x0, c.y0), B2 = layer.mapFromItem(null, c.x1, c.y1);
-            delArea = view.tileManager.viewToScene(Qt.rect(Math.min(A.x, B2.x), Math.min(A.y, B2.y), Math.abs(B2.x - A.x), Math.abs(B2.y - A.y)));
-            delExpect = c.expect; delStep = 0; delTimer.start();
-        } else if (c.action === "resetTemplates") {
-            for (const k of Object.keys(Etat.gabarits)) delete Etat.gabarits[k];
-            log("gabarits oubliés");
         } else if (c.action === "cancel") {
             spec = null;
         }
@@ -556,29 +540,6 @@ Item {
         x.send(txt);
     }
     property bool pendingIsTemplate: false
-    property rect delArea
-    property int delExpect: 0
-    property int delStep: 0
-    property int delSaved: 17
-    Timer {
-        id: delTimer
-        interval: 150
-        repeat: true
-        property int tries: 0
-        onTriggered: {
-            const ctl = f.view.controller, ts = f.view.toolSettings, L = ctl.currentLayer;
-            if (f.delStep === 0) {
-                f.delSaved = f.selectionTool();
-                ctl.clearSelectedItems(); ctl.addSelectionRect(f.delArea, 1); f.delStep = 1; tries = 0; return;
-            }
-            const n = ctl.selectionItemCount;
-            if (n !== f.delExpect && ++tries < 20) return;
-            stop();
-            if (n === f.delExpect) { ctl.deleteSelectedItems(L); f.log("zone effacée : " + n + " éléments"); }
-            else f.log("zone NON effacée : " + n + " éléments sélectionnés au lieu de " + f.delExpect);
-            ctl.clearSelectedItems(); f.restoreTool(f.delSaved);
-        }
-    }
     Timer { id: clearMsg; interval: 2500; onTriggered: f.status = "" }
     property int estimate: 0
     property double launchedAt: 0
