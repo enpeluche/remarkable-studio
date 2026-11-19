@@ -12,32 +12,52 @@ RM_DIR = "/home/root/.local/share/remarkable/xochitl"
 USB_IP = "10.11.99.1"
 
 
-def _tablet_host():
-    """Adresse de la tablette : RM_HOST si donnée ; sinon l'alias « remarkable » d'une configuration SSH propre au
-    projet, qui choisit à CHAQUE connexion l'USB s'il répond, sinon le Wi-Fi (adresse dans tablette.conf : wifi=…).
-    Débrancher / rebrancher en cours de route fonctionne donc sans rien faire."""
-    if os.environ.get("RM_HOST"):
-        return os.environ["RM_HOST"], []
-    here = Path(__file__).resolve().parent
+HERE_DIR = Path(__file__).resolve().parent
+CONF_FILE = HERE_DIR / "tablette.conf"
+SSH_CFG = HERE_DIR / ".ssh_config"
+
+
+def read_wifi():
     wifi = os.environ.get("RM_WIFI", "")
-    conf = here / "tablette.conf"
-    if not wifi and conf.exists():
-        for line in conf.read_text().splitlines():
+    if not wifi and CONF_FILE.exists():
+        for line in CONF_FILE.read_text().splitlines():
             k, _, v = line.partition("=")
             if k.strip() == "wifi":
                 wifi = v.strip()
-    if not wifi:
-        return f"root@{USB_IP}", []
-    cfg = here / ".ssh_config"
-    text = (f"# généré par live.py : USB si branché, sinon Wi-Fi\n"
+    return wifi
+
+
+def write_ssh_config(wifi):
+    """Alias « remarkable » : USB s'il répond (test à CHAQUE connexion), sinon le Wi-Fi s'il est connu."""
+    text = (f"# généré par live.py : USB si branché, sinon Wi-Fi (adresse dans tablette.conf)\n"
             f"Match originalhost remarkable exec \"timeout 1 bash -c '</dev/tcp/{USB_IP}/22' 2>/dev/null\"\n"
             f"  HostName {USB_IP}\n"
-            f"Match originalhost remarkable\n"
-            f"  HostName {wifi}\n"
+            + (f"Match originalhost remarkable\n  HostName {wifi}\n" if wifi else "")
+            + f"Match originalhost remarkable\n  HostName {USB_IP}\n"
             f"Host *\n  User root\n")
-    if not cfg.exists() or cfg.read_text() != text:
-        cfg.write_text(text)
-    return "root@remarkable", ["-F", str(cfg)]
+    if not SSH_CFG.exists() or SSH_CFG.read_text() != text:
+        SSH_CFG.write_text(text)
+
+
+def note_wifi(ip):
+    """Adresse Wi-Fi vue par l'USB : mémorisée si elle a changé (autre réseau, nouvelle adresse)."""
+    if not ip or ip == read_wifi() or os.environ.get("RM_HOST") or os.environ.get("RM_WIFI"):
+        return False
+    lines = [l for l in (CONF_FILE.read_text().splitlines() if CONF_FILE.exists() else [])
+             if l.partition("=")[0].strip() != "wifi"]
+    lines.append(f"wifi={ip}")
+    CONF_FILE.write_text("\n".join(lines) + "\n")
+    write_ssh_config(ip)
+    return True
+
+
+def _tablet_host():
+    """RM_HOST si donnée ; sinon l'alias « remarkable » (configuration SSH propre au projet) : l'USB s'il
+    répond, sinon le Wi-Fi. L'adresse Wi-Fi est relevée automatiquement quand la tablette est branchée en USB."""
+    if os.environ.get("RM_HOST"):
+        return os.environ["RM_HOST"], []
+    write_ssh_config(read_wifi())
+    return "root@remarkable", ["-F", str(SSH_CFG)]
 
 
 RM_HOST, _CFG = _tablet_host()

@@ -27,6 +27,8 @@ import threading
 import time
 import types
 import urllib.parse
+import urllib.request
+import urllib.error
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -578,8 +580,35 @@ class Handler(BaseHTTPRequestHandler):
         path = urllib.parse.urlparse(self.path).path
         try:
             n = int(self.headers.get("Content-Length") or 0)
-            body = json.loads(self.rfile.read(n) or b"{}")
+            body_raw = self.rfile.read(n)
+            body = {} if path == "/api/upload" else json.loads(body_raw or b"{}")
             items = self.lib.snapshot()
+            if path == "/api/upload":
+                # Envoi d'un PDF / EPUB vers la tablette par son interface web USB (Paramètres > Stockage) :
+                # la tablette l'importe elle-même, sans redémarrage. USB uniquement.
+                name = urllib.parse.unquote(self.headers.get("X-Filename", "")).replace("/", "_").strip()
+                ext = os.path.splitext(name)[1].lower()
+                if ext not in (".pdf", ".epub"):
+                    return self.json({"ok": False, "error": "seuls les PDF et EPUB sont acceptés"}, 400)
+                data = body_raw
+                if not data or len(data) > 200 * 1024 * 1024:
+                    return self.json({"ok": False, "error": "fichier vide ou trop gros"}, 400)
+                ctype = "application/pdf" if ext == ".pdf" else "application/epub+zip"
+                boundary = "----rmstudio" + hashlib.sha1(data[:4096] + name.encode()).hexdigest()[:16]
+                payload = (f"--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; "
+                           f"filename=\"{name.replace(chr(34), '')}\"\r\nContent-Type: {ctype}\r\n\r\n").encode() \
+                    + data + f"\r\n--{boundary}--\r\n".encode()
+                req = urllib.request.Request("http://10.11.99.1/upload", data=payload, method="POST",
+                                             headers={"Content-Type": f"multipart/form-data; boundary={boundary}"})
+                try:
+                    with urllib.request.urlopen(req, timeout=120) as r:
+                        ok = 200 <= r.status < 300
+                except urllib.error.HTTPError as e:
+                    return self.json({"ok": False, "error": f"la tablette a refusé le fichier ({e.code})"})
+                except Exception:
+                    return self.json({"ok": False, "error": "interface web USB injoignable : brancher la tablette en "
+                                                            "USB et activer Paramètres > Stockage > Interface web USB"})
+                return self.json({"ok": ok, "name": name})
             if path == "/api/tablet/open":
                 doc = body.get("doc")
                 if doc not in items:

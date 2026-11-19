@@ -6,7 +6,7 @@ import threading
 import time
 from pathlib import Path
 
-from live import RM_HOST, SSH_OPTS, ssh
+from live import RM_HOST, SSH_OPTS, ssh, note_wifi
 
 HERE = Path(__file__).resolve().parent
 LINKS_FILE = HERE / "carnets-lies.json"            # source de vérité, côté PC
@@ -23,13 +23,16 @@ def status(max_age=3):
         if _status["value"] and time.time() - _status["t"] < max_age:
             return _status["value"]
         try:
-            r = ssh(f"[ -p {PIPE} ] && echo mods || echo stock; echo $SSH_CONNECTION", timeout=6)
+            r = ssh(f"[ -p {PIPE} ] && echo mods || echo stock; echo $SSH_CONNECTION; "
+                    "ip -4 addr show wlan0 2>/dev/null | grep -o 'inet [0-9.]*' | cut -d' ' -f2", timeout=6)
             out = r.stdout.decode().split("\n")
             # « usb » = tablette joignable (nom historique) ; link = liaison réellement utilisée
             value = {"usb": r.returncode == 0, "mods": out[0].strip() == "mods",
                      "link": ("usb" if (out[1].split() + ["", "", ""])[2].endswith("10.11.99.1") else "wifi") if r.returncode == 0 and len(out) > 1 else None}
         except Exception:
             value = {"usb": False, "mods": False}
+        if value.get("link") == "usb" and len(out) > 2 and out[2].strip():
+            note_wifi(out[2].strip())                # adresse Wi-Fi actuelle, relevée par l'USB
         _status.update(t=time.time(), value=value)
         return value
 

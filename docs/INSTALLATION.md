@@ -23,8 +23,9 @@ installez votre clé (`ssh-copy-id root@10.11.99.1`) pour ne plus le taper.
 ### Wi-Fi
 
 1. En USB, activer SSH en Wi-Fi (désactivé par défaut) : `ssh root@10.11.99.1 rm-ssh-over-wlan on`.
-2. Copier `pc/tablette.conf.exemple` en `pc/tablette.conf` et y mettre l'adresse Wi-Fi de la tablette
-   (Paramètres → Aide → À propos → Copyrights et licences).
+2. Brancher une fois la tablette en USB pendant qu'elle est connectée à votre Wi-Fi : le serveur relève son
+   adresse Wi-Fi et l'enregistre dans `pc/tablette.conf` (et la remet à jour si elle change). On peut aussi
+   l'écrire soi-même (modèle : `pc/tablette.conf.exemple`).
 3. C'est tout : à chaque connexion, l'USB est utilisé s'il répond, sinon le Wi-Fi (débrancher / rebrancher en
    cours de route fonctionne). La bibliothèque affiche « · USB » ou « · Wi-Fi ».
 
@@ -56,7 +57,15 @@ réseau, à réserver à un réseau de confiance (couper : `rm-ssh-over-wlan off
 4. **Couleurs libres et épaisseur continue** (3.30) : nécessitent le patch du programme, à installer en connaissance
    de cause ([SECURITE.md](SECURITE.md)) : `outils/patch_couleurs.py --j-accepte-les-risques`.
 
-## 3. Après une mise à jour du système
+## 3. Diagnostic
+
+`outils/diagnostic.sh` vérifie en quelques secondes, sans rien modifier : connexion (USB / Wi-Fi), version du
+logiciel, xovi et ses extensions, index, mods installés et actifs, erreurs QML, patch des couleurs, plantages
+récents, interface web USB, SSH en Wi-Fi. Chaque problème est suivi de la commande qui le corrige.
+
+## 4. Après une mise à jour du système
+
+Commencer par `outils/diagnostic.sh`, puis :
 
 - `ssh-keygen -R 10.11.99.1` (la clé de la tablette change) ; vos fichiers dans `/home/root` sont conservés.
 - Reconstruire l'index : `ssh root@10.11.99.1 'echo | /home/root/xovi/rebuild_hashtable'`.

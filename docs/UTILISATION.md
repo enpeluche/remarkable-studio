@@ -26,6 +26,8 @@
 - **Synchro automatique** : toutes les 10 s, seuls les fichiers modifiés sur la tablette sont recopiés ; la page
   se met à jour sans perdre la position. Rien n'est jamais effacé de la sauvegarde. (La tablette n'enregistre une
   page qu'en changeant de page : la page en cours arrive un peu plus tard.)
+- **Envoyer des PDF / EPUB sur la tablette** : bouton « Envoyer », ou glisser-déposer les fichiers sur la page.
+  Ils arrivent dans « Mes fichiers », sans redémarrage (USB, avec Paramètres > Stockage > Interface web USB activé).
 - **Export PDF** : bouton « PDF » d'un document ouvert (Maj+clic : pages annotées seulement). Pages sans
   annotation recopiées telles quelles (texte, liens), encre en vectoriel par-dessus, page agrandie si l'encre
   déborde dans la marge ; pages de notes et carnets : pages blanches avec l'encre.
