@@ -58,3 +58,10 @@
   est enregistré dans la case active. **Appui long** : y copier le crayon actuel. Case gomme : 2e appui = types
   de gomme, tout effacer.
 - **Carnets liés** : lier deux documents depuis la bibliothèque du PC ; un bouton en bas à droite passe de l'un à l'autre.
+- **PDF cadrés sur le texte** (automatique, serveur du PC lancé) : les marges gauche et droite des PDF en portrait
+  sont coupées, le texte est en moyenne 23 % plus gros (jusqu'à +70 % pour un document LaTeX standard). C'est le
+  réglage natif « Ajuster la vue › Personnalisé », valable pour tout le document et appliqué à sa prochaine
+  ouverture ; le bas de la page se lit en faisant glisser. Seuls les PDF encore en vue par défaut et jamais cadrés
+  sont traités : un document remis en « page entière » n'est plus jamais recadré. Désactiver :
+  `"cadrage_auto": false` dans `pc/reglages.json`. Pas de cadrage pour les PDF en paysage, aux formats mélangés,
+  ou aux marges déjà étroites.

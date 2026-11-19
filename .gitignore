@@ -13,6 +13,7 @@ pc/.ssh_config
 # vos commentaires de surlignages et vos réglages
 pc/notes.json
 pc/reglages.json
+pc/cadrage.json
 *.rm
 *.metadata
 *.content

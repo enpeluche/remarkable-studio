@@ -181,3 +181,12 @@ entrée (`… & P=$!; read _; kill $P`), sinon elles s'accumulent.
   Sélection arrondit l'épaisseur (0,9 → 1 au surligneur) : mémoriser et remettre tout le réglage.
 - **Tracé provisoire du Studio** : la mémoire d'écran lue ne contient pas toujours déjà le dernier trait ; ne
   retirer le tracé instantané que quand l'image capturée montre l'encre à sa place.
+- **Zoom d'un document** : `.content` garde `zoomMode` (`bestFit` par défaut, `fitToWidth`, `fitToHeight`,
+  `customFit`) et `customZoomScale`, `customZoomCenterX/Y`, `customZoomPageWidth/Height`, `customZoomOrientation`.
+  `LibraryController.setCustomZoomFit(id, échelle, centre, taille de page)` (QML, `xofm.libs.library`) l'enregistre
+  pour n'importe quel document, ouvert ou non ; l'affichage change à la prochaine ouverture depuis la bibliothèque.
+  Échelle = pixels de l'écran par unité de page (page entière d'un US Letter : 1404 / 1929,5 = 0,7276) ; centre =
+  point de la page au milieu de l'écran. `setZoomMode(id, 0)` = `bestFit`, `1` = `fitToWidth`, `3` = `customFit`.
+- **Synchro par `find -newer`** : la tablette écrit un fichier dans un temporaire puis le renomme ; le fichier
+  garde l'heure d'écriture, qui peut précéder le repère posé par un passage tombé entre les deux. Poser le repère
+  quelques secondes dans le passé (`touch -d "@$(( $(date +%s) - 2 ))"`).

@@ -44,6 +44,7 @@ import draw
 import formules
 import screen
 import autosync
+import cadrage
 import export_pdf
 import annots
 import autohl
@@ -591,6 +592,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.json({"pages": res})
             if parts == ["api", "autohl"]:
                 return self.json({"on": self.autohl.enabled, "last": self.autohl.last})
+            if parts == ["api", "cadrage"]:
+                return self.json({"on": self.cadreur.enabled, "last": self.cadreur.last})
             if parts == ["api", "library", "version"]:
                 return self.json({"v": self.sync.version, **self.sync.last})
             if parts == ["api", "library"]:
@@ -709,6 +712,9 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/autohl":
                 self.autohl.set_enabled(bool(body.get("on")))
                 return self.json({"on": self.autohl.enabled})
+            if path == "/api/cadrage":
+                self.cadreur.set_enabled(bool(body.get("on")))
+                return self.json({"on": self.cadreur.enabled})
             if path == "/api/upload":
                 # Envoi d'un PDF / EPUB vers la tablette par son interface web USB (Paramètres > Stockage) :
                 # la tablette l'importe elle-même, sans redémarrage. USB uniquement.
@@ -876,6 +882,7 @@ def main():
     Handler.current = live.CurrentPage(lib, Path(a.data))
     Handler.sync = autosync.AutoSync(lib, Path(a.data), active=lambda: time.time() - Handler.last_request < 120)
     Handler.autohl = autohl.AutoHighlighter(Handler.pen, Handler.current, Handler.renderer)
+    Handler.cadreur = cadrage.Cadreur(lib, Handler.current, tablet.formes_cmd)
     threading.Thread(target=annots.warm_up, args=(lib, Handler.renderer), daemon=True).start()
     threading.Thread(target=_prune_loop, args=(Handler.renderer.cache,), daemon=True).start()
     srv = ThreadingHTTPServer(("127.0.0.1", a.port), Handler)

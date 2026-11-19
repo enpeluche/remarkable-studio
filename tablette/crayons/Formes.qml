@@ -6,6 +6,7 @@
 // par le geste natif de la tablette).
 import QtQuick
 import com.remarkable
+import xofm.libs.library
 import common
 import xofm.libs.peninput
 import net.asivery.CommandExecutor 1.0
@@ -66,6 +67,21 @@ Item {
             log("diag vue status=" + view.status + " visible=" + view.visible + " page=" + (view.tileManager ? view.tileManager.pageId : "?") + " opacité=" + view.opacity);
             log("diag bas de page : " + rectsIn(r) + " | outil " + view.toolSettings.activePen.tool
                 + " | gabarits " + Object.keys(Etat.gabarits).join(", ") + " | zone " + tplArea + " attendu " + tplExpect);
+        } else if (c.action === "zoomInfo") {
+            // lecture seule : état du zoom de la vue
+            const tm = view.tileManager, pr = view.controller.primaryContentRect;
+            log("zoomInfo mode=" + view.zoomMode + " scale=" + tm.scale + " center=" + tm.center + " defaultScale=" + view.defaultScale
+                + " pdf=" + pr + " doc=" + (view.document ? view.document.id : "?") + " vue=" + view.width + "x" + view.height);
+        } else if (c.action === "zoomFit") {
+            // cadrage enregistré pour TOUT le document (comme « Ajuster la vue > personnalisé »), appliqué à sa
+            // prochaine ouverture ; c.list : plusieurs documents ; c.mode seul : mode de vue (0 = page entière)
+            let n = 0;
+            for (const z of (c.list || [c])) {
+                if (z.mode !== undefined) LibraryController.setZoomMode(z.doc, z.mode);
+                else LibraryController.setCustomZoomFit(z.doc, z.scale, Qt.point(z.cx, z.cy), Qt.size(z.w, z.h));
+                n++;
+            }
+            log("zoomFit : " + n + " document(s)");
         } else if (c.action === "pen") {
             // pendant une forme, le stylet simulé survole la page : le surligneur automatique du PC le prend pour
             // le vrai et demanderait une autre épaisseur (constaté) ; changer le crayon fausserait aussi le gabarit

@@ -37,7 +37,11 @@ class AutoSync:
 
     def run_once(self):
         with self.lock:
-            r = ssh(f"touch {MARK}.new; if [ -f {MARK} ]; then cd {RM_DIR} && find . -newer {MARK} -type f; "
+            # repère posé 2 s dans le passé : la tablette écrit dans un fichier temporaire puis le renomme, le fichier
+            # garde l'heure d'écriture ; un passage tombé entre les deux le manquait pour toujours (constaté).
+            # Un fichier peut être recopié deux fois : sans conséquence.
+            r = ssh(f'touch -d "@$(( $(date +%s) - 2 ))" {MARK}.new; '
+                    f"if [ -f {MARK} ]; then cd {RM_DIR} && find . -newer {MARK} -type f; "
                     f"else echo __FULL__; fi; mv {MARK}.new {MARK}", timeout=20)
             if r.returncode != 0:
                 raise RuntimeError("tablette injoignable")

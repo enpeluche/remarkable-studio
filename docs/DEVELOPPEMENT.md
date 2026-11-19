@@ -16,6 +16,7 @@ tester, et les règles à respecter. Pour le *pourquoi* technique (format, adres
 | `tablet.py` | état de la tablette, ouverture de page, liens, palette, commandes pour `Formes.qml` (`formes_cmd`) |
 | `annots.py` | recherche dans le texte, annotations d'une page (surlignages + texte, traits), recherche globale, commentaires (`notes.json`) |
 | `autohl.py` | surligneur à la taille du texte (survol du stylet → épaisseur) |
+| `cadrage.py` | cadrage automatique des PDF (mesure des marges, `zoomFit` envoyé à `Formes.qml`, confirmation par la sauvegarde) |
 | `autosync.py` | synchro de la sauvegarde toutes les 10 s (fichiers modifiés seulement) |
 | `export_pdf.py` | export PDF : pages d'origine + encre vectorielle + vrais surlignages PDF |
 | `draw.py`, `formules.py` | dessin injecté, formules LaTeX → image |
@@ -46,7 +47,8 @@ de l'image en direct du Studio, avec seuils).
 | Sens | Moyen | Contenu |
 |---|---|---|
 | tablette → PC | `/home/root/xovi/formes/vue.json` | page affichée, orientation, correspondance écran → page, masque d'interface, crayon |
-| PC → tablette | `/home/root/xovi/crayons/formes-cmd.json` | commandes (`build`, `place`, `marks`, `pen`, `image`, `placeImage`, `cancel`), id croissant |
+| PC → tablette | `/home/root/xovi/crayons/formes-cmd.json` | commandes (`build`, `place`, `marks`, `pen`, `image`, `placeImage`, `zoomFit`, `cancel` ; mise au point : `diag`,
+`zoomInfo`, `deleteArea`, `resetTemplates`), id croissant |
 | PC ← tablette | `/dev/input/event1` (lecture) | stylet, survol compris |
 | PC ← tablette | `/proc/<pid>/mem` de xochitl | image de l'écran |
 | PC → tablette | `http://10.11.99.1/upload` | envoi de fichiers (interface web USB officielle) |
@@ -61,12 +63,12 @@ Lecture : `/` (bibliothèque), `/studio`, `/api/library`, `/api/library/version`
 `/api/pagebg/<doc>/<n>` (PDF seul), `/api/text/<doc>/<n>`, `/api/search/<doc>?q=`, `/api/annotations/<doc>`,
 `/api/notes/<doc>`, `/api/highlights?q=` (tous documents), `/api/export/<doc>.pdf[?annotees=1]`, `/api/thumb/<doc>`,
 `/api/file/<doc>.pdf|.epub`, `/api/live/state`, `/api/live/pen` (flux SSE), `/api/screen/next?after=<seq>`
-(image + en-têtes `X-Seq`, `X-Vue`), `/api/screen/stats`, `/api/pen`, `/api/palette`, `/api/autohl`,
+(image + en-têtes `X-Seq`, `X-Vue`), `/api/screen/stats`, `/api/pen`, `/api/palette`, `/api/autohl`, `/api/cadrage`,
 `/api/tablet/status`.
 
 Écriture (POST, en-tête `X-RM-Viewer: 1` obligatoire) : `/api/tablet/open`, `/api/tablet/start`, `/api/links`,
 `/api/pen`, `/api/palette`, `/api/formes/build`, `/api/annot` (surligner/souligner/barrer), `/api/draw`,
-`/api/latex/render`, `/api/latex/send`, `/api/notes`, `/api/autohl`, `/api/upload` (corps brut + `X-Filename`).
+`/api/latex/render`, `/api/latex/send`, `/api/notes`, `/api/autohl`, `/api/cadrage`, `/api/upload` (corps brut + `X-Filename`).
 
 ## Données et caches (jamais dans le dépôt)
 
@@ -75,7 +77,8 @@ Lecture : `/` (bibliothèque), `/studio`, `/api/library`, `/api/library/version`
 | `pc/xochitl/` | sauvegarde des documents (synchro auto) |
 | `pc/.cache/` | pages rendues (SVG), PNG des PDF, texte extrait (`*-p<i>-text.json`), annotations par page (`*-annots2-<mtime>.json`), formules. Limité à 300 Mo : les rendus les moins récemment utilisés sont retirés (toutes les 30 min) |
 | `pc/notes.json` | commentaires des surlignages |
-| `pc/reglages.json` | réglages (surligneur auto) |
+| `pc/reglages.json` | réglages (surligneur auto, cadrage auto) |
+| `pc/cadrage.json` | état du cadrage de chaque PDF (fait, aucun, envoyé, échec) |
 | `pc/tablette.conf`, `pc/.ssh_config` | adresse Wi-Fi, configuration SSH générée |
 | `pc/carnets-lies.json`, `pc/crayons.json` | liens entre documents, palette |
 
