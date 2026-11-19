@@ -67,6 +67,14 @@ Item {
             log("diag vue status=" + view.status + " visible=" + view.visible + " page=" + (view.tileManager ? view.tileManager.pageId : "?") + " opacité=" + view.opacity);
             log("diag bas de page : " + rectsIn(r) + " | outil " + view.toolSettings.activePen.tool
                 + " | gabarits " + Object.keys(Etat.gabarits).join(", ") + " | zone " + tplArea + " attendu " + tplExpect);
+        } else if (c.action === "open") {
+            // ouvrir un document à une page (Studio, bibliothèque du PC) : fonction onOpened de la vue principale,
+            // comme le faisait carnets_lies.qmd sur signal (le signal n'arrive pas)
+            const mv = findItem(it => typeof it.onOpened === "function" && "documentViewActive" in it);
+            if (mv) { mv.onOpened({ documentId: c.doc, page: c.page !== undefined ? c.page : -1 }); log("ouverture " + c.doc + " page " + c.page); }
+            else log("ouverture impossible : vue principale introuvable");
+        } else if (c.action === "linksReload") {
+            log("liens relus : " + reloadLinks() + " bouton(s)");
         } else if (c.action === "zoomInfo") {
             // lecture seule : état du zoom de la vue
             const tm = view.tileManager, pr = view.controller.primaryContentRect;
@@ -853,5 +861,25 @@ Item {
         }
     }
 
-    Component.onCompleted: log("formes prêtes")
+    // Bouton des carnets liés (carnets_lies.qmd) : relire /home/root/carnets-lies.json. Remplace le signal
+    // carnetsReload de xovi-message-broker, qui n'arrive pas (constaté) ; bouton trouvé par ses propriétés.
+    // Aussi à chaque ouverture de document : la liste a pu changer pendant qu'aucun document n'était ouvert.
+    function findItem(test) {                  // premier élément de l'interface qui satisfait test (parcours)
+        let top = f; while (top.parent) top = top.parent;
+        const walk = (it, d) => {
+            if (!it || d > 60) return null;
+            try { if (test(it)) return it; } catch (e) {}
+            const ch = it.children || [];
+            for (let i = 0; i < ch.length; i++) { const r = walk(ch[i], d + 1); if (r) return r; }
+            return null;
+        };
+        return walk(top, 0);
+    }
+    function reloadLinks() {
+        const b = findItem(it => typeof it.reload === "function" && it.links !== undefined && "currentDoc" in it);
+        if (b) b.reload();
+        return b ? 1 : 0;
+    }
+    Timer { id: linksTimer; interval: 1500; onTriggered: f.reloadLinks() }
+    Component.onCompleted: { log("formes prêtes"); linksTimer.start(); }
 }

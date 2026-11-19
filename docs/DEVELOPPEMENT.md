@@ -47,12 +47,12 @@ de l'image en direct du Studio, avec seuils).
 | Sens | Moyen | Contenu |
 |---|---|---|
 | tablette → PC | `/home/root/xovi/formes/vue.json` | page affichée, orientation, correspondance écran → page, masque d'interface, crayon |
-| PC → tablette | `/home/root/xovi/crayons/formes-cmd.json` | commandes (`build`, `place`, `marks`, `pen`, `image`, `placeImage`, `zoomFit`, `cancel` ; mise au point : `diag`,
+| PC → tablette | `/home/root/xovi/crayons/formes-cmd.json` | commandes (`build`, `place`, `marks`, `pen`, `image`, `placeImage`, `zoomFit`, `open`, `linksReload`, `cancel` ; mise au point : `diag`,
 `zoomInfo`, `deleteArea`, `resetTemplates`), id croissant |
 | PC ← tablette | `/dev/input/event1` (lecture) | stylet, survol compris |
 | PC ← tablette | `/proc/<pid>/mem` de xochitl | image de l'écran |
 | PC → tablette | `http://10.11.99.1/upload` | envoi de fichiers (interface web USB officielle) |
-| PC ↔ tablette | `/run/xovi-mb` (xovi-message-broker) | **seulement** ouvrir une page, recharger les liens (sollicité souvent, il fait planter l'interface) |
+| PC → tablette | `formes-cmd.json` : `open`, `linksReload` | ouvrir un document à une page, relire les carnets liés (quand un document est ouvert ; la liste est aussi relue à chaque ouverture). xovi-message-broker n'est plus utilisé : ses signaux n'arrivent plus, et sollicité souvent il faisait planter l'interface |
 
 Rechargement à chaud : incrémenter `/home/root/xovi/crayons/formes.version` (ou `quad.version`) ;
 `PenMenu.qml` est relu à chaque ouverture du menu. Un changement de `.qmd` demande `xovi/start` (PIN).

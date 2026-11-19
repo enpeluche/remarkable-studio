@@ -1,6 +1,5 @@
 """Actions sur la tablette : état, ouverture à distance, liens entre documents, (ré)activation des mods xovi."""
 import json
-import shlex
 import subprocess
 import threading
 import time
@@ -42,16 +41,10 @@ def _invalidate():
         _status["t"] = 0
 
 
-def send_signal(name, value=""):
-    """Envoie un signal à l'interface via xovi-message-broker. Ne fait rien si le canal n'existe pas."""
-    msg = shlex.quote(f"u{name}:{value}")
-    # le test -p évite de créer un fichier ordinaire ; timeout car écrire dans un tube sans lecteur bloque
-    r = ssh(f"[ -p {PIPE} ] && echo {msg} | timeout 3 tee {PIPE} >/dev/null && echo ok", timeout=10)
-    return r.stdout.decode().strip() == "ok"
-
-
 def open_document(doc_id, page=-1):
-    return send_signal("carnetsOpen", f"{doc_id},{int(page)}")
+    """Ouvre un document à une page. Par Formes.qml (le signal carnetsOpen de xovi-message-broker n'arrive pas) :
+    fonctionne quand un document est déjà ouvert sur la tablette (Formes.qml n'écoute que dans un document)."""
+    return formes_cmd({"action": "open", "doc": doc_id, "page": int(page)})
 
 
 def start_mods():
@@ -99,7 +92,9 @@ def push_links():
                        input=data, capture_output=True, timeout=15)
     if r.returncode != 0:
         return {"pushed": False, "reloaded": False}
-    return {"pushed": True, "reloaded": send_signal("carnetsReload")}
+    # relecture demandée à Formes.qml (le signal carnetsReload n'arrive pas) ; sans document ouvert, la liste
+    # est relue à la prochaine ouverture
+    return {"pushed": True, "reloaded": formes_cmd({"action": "linksReload"})}
 
 
 # ---------------------------------------------------------------- crayons

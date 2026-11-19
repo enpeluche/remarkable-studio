@@ -190,3 +190,7 @@ entrée (`… & P=$!; read _; kill $P`), sinon elles s'accumulent.
 - **Synchro par `find -newer`** : la tablette écrit un fichier dans un temporaire puis le renomme ; le fichier
   garde l'heure d'écriture, qui peut précéder le repère posé par un passage tombé entre les deux. Poser le repère
   quelques secondes dans le passé (`touch -d "@$(( $(date +%s) - 2 ))"`).
+- **Signaux xovi-message-broker non reçus** : depuis le lancement des modifications du 18/11, `carnetsOpen` et
+  `carnetsReload` sont écrits dans `/run/xovi-mb` sans erreur mais n'atteignent jamais le QML (aucune trace dans le
+  journal). Parade sans redémarrage : un QML rechargeable à chaud (`Formes.qml`) parcourt l'arbre de l'interface et
+  appelle directement `onOpened({documentId, page})` de la vue principale, ou `reload()` du bouton des carnets liés.
