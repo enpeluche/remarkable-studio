@@ -65,7 +65,7 @@ def attendre(t, depuis, delai):
         n = int(m[-1][0]) if m else None
         if re.search(r"introuvable|sélection du gabarit|FORMES erreur|regroupement : erreur", log):
             return log, n
-        if "forme regroupée" in log or "abandonn" in log:
+        if "forme regroupée" in log or "abandonn" in log or "recollage raté" in log:
             return log, n
         if n is not None and (n <= 1 or "zone déjà occupée" in log):   # pas de regroupement
             return log, n
@@ -155,13 +155,17 @@ def main():
         detail = f"{n} construits, {apres} dans la zone, crayon {outil}, {time.time() - t0:.1f} s"
         if "forme regroupée" in log:
             detail += ", regroupée"
+        elif "recollage raté" in log:
+            detail += ", NON regroupée (recollage raté, forme retracée)"
         print(f"{nom:10s} {'OK ' if ok else 'ÉCHEC'} {detail}")
         for l in erreurs:
             print("           " + re.sub(r"\x1b\[[0-9;]*m", "", l)[:200])
         bilan.append((nom, ok, detail))
+    time.sleep(1.5)
     v = t.vue()
-    print(f"crayon final : {v['pen']['tool']} (attendu {outil0})")
-    ok = all(b[1] for b in bilan) and v["pen"]["tool"] == outil0
+    reglage = lambda pen: {k: pen.get(k) for k in ("tool", "color", "argb", "thickness")}
+    print(f"crayon final : {reglage(v['pen'])} (au départ {reglage(v0['pen'])})")
+    ok = all(b[1] for b in bilan) and reglage(v["pen"]) == reglage(v0["pen"])
     print("RÉSULTAT :", "tout est bon" if ok else "des échecs")
     sys.exit(0 if ok else 1)
 

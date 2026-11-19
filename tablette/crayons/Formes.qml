@@ -67,6 +67,9 @@ Item {
             log("diag bas de page : " + rectsIn(r) + " | outil " + view.toolSettings.activePen.tool
                 + " | gabarits " + Object.keys(Etat.gabarits).join(", ") + " | zone " + tplArea + " attendu " + tplExpect);
         } else if (c.action === "pen") {
+            // pendant une forme, le stylet simulé survole la page : le surligneur automatique du PC le prend pour
+            // le vrai et demanderait une autre épaisseur (constaté) ; changer le crayon fausserait aussi le gabarit
+            if (busy()) { log("réglage du crayon ignoré : forme en cours"); return; }
             setPen(c);
         } else if (c.action === "marks") {
             marks(c);
@@ -169,14 +172,27 @@ Item {
     // Si la zone était vide, la forme est ensuite regroupée pour qu'« Annuler » la retire d'un coup.
     // Outil Sélection : à poser sur le crayon ACTIF (le bouton 4 cases active le crayon secondaire, pas le
     // principal) ; addSelectionRect ne sélectionne rien si le crayon actif n'est pas l'outil Sélection.
+    // Repasser du Sélection au crayon arrondit son épaisseur (0,9 -> 1 au surligneur, constaté) : tout le réglage
+    // est mémorisé puis remis.
     property var selPen: null
+    property var selSaved: null
     function selectionTool() {
         const p = view.toolSettings.activePen, t = p.tool;
         selPen = p;
+        selSaved = { tool: t, color: p.color, colorCode: p.colorCode >>> 0, thickness: p.thickness };
         p.tool = Line.SelectionTool;
         return t;
     }
-    function restoreTool(t) { (selPen || view.toolSettings.activePen).tool = t; selPen = null; }
+    function restoreTool(t) {
+        const p = selPen || view.toolSettings.activePen, r = selSaved;
+        p.tool = t;
+        if (r && r.tool === t) {
+            if (p.color !== r.color) p.color = r.color;
+            if ((p.colorCode >>> 0) !== r.colorCode) p.colorCode = r.colorCode;
+            if (p.thickness !== r.thickness) p.thickness = r.thickness;
+        }
+        selPen = null; selSaved = null;
+    }
     function isWriting() {
         const t = view.toolSettings.activePen.tool;
         return t !== Line.SelectionTool && t !== Line.Eraser && t !== Line.EraseSection && t !== Line.ZoomTool;
@@ -599,6 +615,10 @@ Item {
     }
     Timer { id: clearMsg; interval: 2500; onTriggered: f.status = "" }
     property int estimate: 0
+    function busy() {
+        return pendingFile !== "" || job !== null || tplTimer.running || grouping.running || delTimer.running
+               || Date.now() < launchedAt + estimate + 3000;
+    }
     property double launchedAt: 0
 
     // attendre que le vrai stylet soit éloigné, sinon ses événements se mêleraient au tracé
