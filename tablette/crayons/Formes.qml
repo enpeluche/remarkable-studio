@@ -272,12 +272,17 @@ Item {
                 spots.push([x, y]);
         // le gabarit est tracé dans le repère de la PAGE (droite horizontale dans la page) : en paysage il est
         // donc vertical sur l'écran physique. Zones vérifiées dans les deux repères.
+        // taille fixe SUR L'ÉCRAN (400 px / rayon 60 px) quel que soit le zoom : k = pixels écran par unité
+        // du calque ; sinon, document zoomé, le gabarit déborde de sa zone et n'est pas retrouvé
+        const k0 = layer.mapToItem(null, 0, 0), k1 = layer.mapToItem(null, 100, 0);
+        const k = Math.max(0.05, Math.hypot(k1.x - k0.x, k1.y - k0.y) / 100);
+        const lineLen = 400 / k, radius = 60 / k;
         let box = null, L0 = null;
         for (const sp of spots) {
             const Ls = layer.mapFromItem(null, sp[0], sp[1]);               // point de départ, repère de la page affichée
             let sx0, sy0, sx1, sy1;
             if (kind === "line") {
-                const Se = layer.mapToItem(null, Ls.x + 400, Ls.y);          // autre extrémité, écran physique
+                const Se = layer.mapToItem(null, Ls.x + lineLen, Ls.y);          // autre extrémité, écran physique
                 sx0 = Math.min(sp[0], Se.x) - 30; sy0 = Math.min(sp[1], Se.y) - 30;
                 sx1 = Math.max(sp[0], Se.x) + 30; sy1 = Math.max(sp[1], Se.y) + 30;
             } else { sx0 = sp[0] - 90; sy0 = sp[1] - 90; sx1 = sp[0] + 90; sy1 = sp[1] + 90; }
@@ -292,16 +297,16 @@ Item {
         if (kind === "line") {
             // redressement natif indispensable : le gabarit doit être PARFAITEMENT droit (2 points), car il est
             // écrasé/étiré jusqu'à ×60 pour garder l'épaisseur ; le moindre écart d'injection serait amplifié
-            for (let i = 0; i <= 100; i++) pts.push([L0.x + 4 * i, L0.y]);
+            for (let i = 0; i <= 100; i++) pts.push([L0.x + lineLen * i / 100, L0.y]);
         } else {
             const n = 96;
             for (let i = 0; i <= Math.round(n * 1.04); i++) {
                 const t = 2 * Math.PI * i / n;
-                pts.push([L0.x + 60 * Math.cos(t), L0.y + 60 * Math.sin(t)]);
+                pts.push([L0.x + radius * Math.cos(t), L0.y + radius * Math.sin(t)]);
             }
         }
-        const s0 = toScene([0, 0]), s1 = toScene([400, 0]);
-        tplExpect = Math.hypot(s1.x - s0.x, s1.y - s0.y) * (kind === "line" ? 1 : 0.3);   // 400 px ou 120 px (repère page)
+        const s0 = toScene([0, 0]), s1 = toScene([lineLen, 0]);
+        tplExpect = Math.hypot(s1.x - s0.x, s1.y - s0.y) * (kind === "line" ? 1 : 0.3);   // 400 px ou 120 px à l'écran
         tplStep = 0;
         inject([{ hold: 1000, pts: pts }], true);
     }
@@ -313,6 +318,9 @@ Item {
         onTriggered: {
             const ctl = f.view.controller, ts = f.view.toolSettings, L = ctl.currentLayer;
             if (f.tplStep === 0) {
+                // tracé pas fini : la tablette remplace le trait par sa version redressée à la fin du maintien ;
+                // sélectionner l'ancien trait avant ce remplacement fait échouer la sélection
+                if (Date.now() - f.launchedAt < f.estimate + 900) return;
                 const r = f.rectsIn(f.tplArea);
                 const re = /QRect\(([-\d]+), ([-\d]+), (\d+), (\d+)\)/g;
                 let m, found = null;
@@ -336,10 +344,13 @@ Item {
             } else if (f.tplStep === 1) {
                 ctl.clearSelectedItems();
                 ctl.addSelectionRect(f.tplArea, 1);
-                f.tplStep = 2;
+                f.tplStep = 2; tries = 0;
             } else if (f.tplStep === 2) {
                 if (ctl.selectionItemCount !== 1) {
-                    if (++tries > 100) { stop(); f.status = "Sélection du gabarit impossible"; ts.primaryPen.tool = f.savedTool;
+                    if (tries % 8 === 7) { ctl.clearSelectedItems(); ctl.addSelectionRect(f.tplArea, 1); }   // nouvel essai
+                    if (++tries > 60) { stop(); f.status = "Sélection du gabarit impossible";
+                                        f.log("sélection du gabarit : " + ctl.selectionItemCount + " élément(s) " + f.rectsIn(f.tplArea));
+                                        ctl.clearSelectedItems(); ts.primaryPen.tool = f.savedTool;
                                          if (f.job) { f.restoreStyle(f.job); f.job = null; } }
                     return;
                 }
@@ -523,6 +534,7 @@ Item {
     property bool pendingIsTemplate: false
     Timer { id: clearMsg; interval: 2500; onTriggered: f.status = "" }
     property int estimate: 0
+    property double launchedAt: 0
 
     // attendre que le vrai stylet soit éloigné, sinon ses événements se mêleraient au tracé
     Timer {
@@ -539,6 +551,7 @@ Item {
             f.pendingFile = "";
             exe.executeCommand("/bin/sh", ["-c", "/home/root/xovi/formes/trace.sh '" + p + "' >/dev/null 2>&1 &"]);
             f.status = "Préparation du gabarit…";
+            f.launchedAt = Date.now();
             tplTimer.tries = 0;
             tplTimer.start();
         }
