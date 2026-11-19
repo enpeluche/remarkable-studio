@@ -172,3 +172,12 @@ entrée (`… & P=$!; read _; kill $P`), sinon elles s'accumulent.
   bas-gauche, bas-droite), un rendu `/AP` (fondu « multiplier »), et le commentaire dans `/Contents` (Zotero relit
   lui-même le texte sous les zones).
 - **Les blocs inconnus 14 et 15** apparaissent dans les pages 3.30 (rmscene 0.8 les ignore sans dommage).
+- **Protocole « taille puis contenu » sur un fichier vivant** : annoncer `wc -c` de `vue.json` puis le `cat`
+  donne parfois moins d'octets qu'annoncé (réécrit entre les deux) ; le PC les attend indéfiniment et la capture
+  d'écran se fige (constaté après des heures). Parade : copier le fichier avant de le mesurer, et un délai maximal
+  (15 s) sur chaque réponse, qui coupe la connexion (groupe de processus entier) pour la refaire.
+- **Le crayon actif n'est pas forcément `primaryPen`** : le bouton 4 cases active le crayon secondaire ; tout ce
+  qui change d'outil (passage à l'outil Sélection) doit viser `toolSettings.activePen`. Revenir de l'outil
+  Sélection arrondit l'épaisseur (0,9 → 1 au surligneur) : mémoriser et remettre tout le réglage.
+- **Tracé provisoire du Studio** : la mémoire d'écran lue ne contient pas toujours déjà le dernier trait ; ne
+  retirer le tracé instantané que quand l'image capturée montre l'encre à sa place.

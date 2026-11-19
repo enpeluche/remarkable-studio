@@ -507,6 +507,7 @@ function drawLiveFrame() {
     if (!(mn[j] - l > 30 || (chroma > 45 && pc < 25))) L[i + 3] = 0;
   }
   fc.putImageData(live, 0, 0);
+  confirmStrokes(L, mn);
   // 3) interface de la tablette : cases vidées dans les deux calques
   const m = frameVue.mask, cell = frameVue.cell || 24;
   if (!m) return;
@@ -521,6 +522,29 @@ function drawLiveFrame() {
       bc.clearRect(x - 2, y - 2, cell + 4, cell + 4);
     }
   }
+}
+// Tracé provisoire (stylet) retiré seulement quand l'image capturée montre l'encre à sa place : la tablette
+// ne l'a pas toujours déjà dessiné dans la mémoire lue (sinon le mot disparaissait quelques secondes).
+// On ne juge que les points posés sur un fond clair du PDF (de l'encre sur du texte imprimé ne se distingue pas).
+function confirmStrokes(L, mn) {
+  if (!frameVue.pageId || frameVue.pageId !== docState.pageId) return;
+  let changed = false;
+  strokes = strokes.filter(s => {
+    if (!s.end) return true;
+    let n = 0, ok = 0;
+    const step = Math.max(1, Math.floor(s.p.length / 60)), r = Math.max(2, Math.ceil(s.w / 2) + 1);
+    for (let i = 0; i < s.p.length; i += step) {
+      const x = Math.round(s.p[i][0]), y = Math.round(s.p[i][1]);
+      if (x < r || y < r || x >= W - r || y >= H - r || mn[y * W + x] < 170) continue;
+      n++;
+      search: for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++)
+        if (L[((y + dy) * W + x + dx) * 4 + 3]) { ok++; break search; }
+    }
+    const confirmed = n === 0 ? Date.now() - s.end > 1500 : ok >= n * 0.7;
+    if (confirmed) changed = true;
+    return !confirmed;
+  });
+  if (changed) { redrawInk(); syncInk(); }
 }
 function syncInk() {
   if (!liveEl || liveEl.hidden) return;
@@ -561,7 +585,11 @@ async function screenLoop() {
 setInterval(() => {
   if (!lastFrameAt) return;
   const age = (Date.now() - lastFrameAt) / 1000;
-  $('#scrstate').textContent = `Écran en direct · ${age < 1 ? 'à jour' : 'il y a ' + Math.round(age) + ' s'}`;
+  // au repos, une image de contrôle arrive toutes les 15 s : au-delà de 40 s sans image, la capture est bloquée
+  const stale = age > 40;
+  $('#dot').className = 'dot ' + (stale ? 'warn' : 'ok');
+  $('#scrstate').textContent = stale ? `Écran en direct : aucune image depuis ${Math.round(age)} s (le serveur relance la capture)`
+                                     : `Écran en direct · ${age < 1 ? 'à jour' : 'il y a ' + Math.round(age) + ' s'}`;
 }, 1000);
 screenLoop();
 
@@ -584,9 +612,11 @@ function redrawInk() {
     s.p.forEach((q, i) => i ? ink.lineTo(q[0], q[1]) : ink.moveTo(q[0], q[1])); ink.stroke(); }
 }
 function onNewFrame() {
-  // l'image de l'écran contient désormais les traits terminés depuis un moment : on retire le tracé provisoire
+  // les traits provisoires sont retirés quand l'image les montre (confirmStrokes) ; filet : 15 s
   const now = Date.now();
-  strokes = strokes.filter(s => !s.end || now - s.end < 700);
+  // vue changée (page, zoom, défilement) : les traits provisoires, en coordonnées d'écran, ne sont plus à leur place
+  const vue = JSON.stringify([docState.pageId, docState.map]);
+  strokes = strokes.filter(s => !s.end || (now - s.end < 15000 && s.vue === vue));
   redrawInk();
   if (mode === 'doc' && typeof syncInk === 'function') syncInk();
 }
@@ -598,7 +628,7 @@ es.onmessage = e => {
     const [x, y, p, f] = m.p, [sx, sy] = mapPen(x, y), touch = f & 1, rubber = f & 2;
     lastPenAt = Date.now();
     if (touch && !rubber) {
-      if (!cur) { cur = { p: [[sx, sy]], c: penColor(), w: penWidth(), end: 0 }; strokes.push(cur); }
+      if (!cur) { cur = { p: [[sx, sy]], c: penColor(), w: penWidth(), end: 0, vue: JSON.stringify([docState.pageId, docState.map]) }; strokes.push(cur); }
       else {
         const q = cur.p[cur.p.length - 1];
         ink.strokeStyle = cur.c; ink.lineWidth = cur.w; ink.lineCap = 'round';

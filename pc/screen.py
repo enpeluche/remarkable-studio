@@ -14,6 +14,8 @@ d'interface que lorsqu'un Studio regarde.
 """
 import gzip
 import json
+import os
+import signal
 import subprocess
 import threading
 import time
@@ -36,7 +38,9 @@ VUE = "/home/root/xovi/formes/vue.json"
 REMOTE = (
     'while read -r c a b; do '
     'date +%s > /home/root/xovi/formes/studio.watch; '
-    f'if [ "$c" = V ]; then wc -c < {VUE} 2>/dev/null || echo 0; cat {VUE} 2>/dev/null; continue; fi; '
+    # copie d'abord : vue.json est réécrit souvent ; annoncer sa taille puis le relire pouvait donner moins
+    # d'octets qu'annoncé, et le PC les attendait indéfiniment (capture figée, constaté)
+    f'if [ "$c" = V ]; then cat {VUE} > /tmp/rmv-vue 2>/dev/null; wc -c < /tmp/rmv-vue; cat /tmp/rmv-vue; continue; fi; '
     'P=$(pidof xochitl xochitl-libre | cut -d" " -f1); '
     'A=$(grep -A1 "/dev/fb0" /proc/$P/maps 2>/dev/null | tail -n 1 | cut -d- -f1); '
     'if [ -z "$A" ]; then echo 0; continue; fi; '
@@ -63,10 +67,14 @@ class ScreenStream:
         self.boost_until = 0.0
         self.error = None
         self.stats = {"full": 0, "band": 0, "reasons": {}}
+        self.beat = 0.0                 # dernier tour de la boucle de capture
 
     # -- côté serveur web
     def touch(self):
         self.last_use = time.time()
+        # boucle de capture vivante mais immobile depuis 30 s : couper sa connexion la débloque
+        if self.thread and self.thread.is_alive() and self.beat and time.time() - self.beat > 30:
+            self._kill_proc()
         with self.lock:
             if not self.thread or not self.thread.is_alive():
                 # capture endormie (aucun Studio depuis 15 s) : l'image gardée peut être très ancienne
@@ -89,15 +97,42 @@ class ScreenStream:
     # -- échanges avec la tablette
     def _open(self):
         if self.proc is None or self.proc.poll() is not None:
-            self.proc = subprocess.Popen(["ssh", *SSH_OPTS, RM_HOST, REMOTE],
+            self.proc = subprocess.Popen(["ssh", *SSH_OPTS, RM_HOST, REMOTE], start_new_session=True,
                                          stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
 
+    def _kill_proc(self, p=None):
+        """Tue la connexion et tout son groupe de processus (rien ne doit garder le tuyau ouvert)."""
+        p = p or self.proc
+        if p:
+            try:
+                os.killpg(p.pid, signal.SIGKILL)
+            except Exception:
+                try:
+                    p.kill()
+                except Exception:
+                    pass
+
     def _ask(self, line):
+        """Une commande, une réponse. Garde-fou : sans réponse complète en 15 s, la connexion est coupée
+        (la lecture se termine alors en erreur et la boucle repart sur une connexion neuve)."""
         self._open()
-        self.proc.stdin.write(line.encode() + b"\n")
-        self.proc.stdin.flush()
-        n = int(self.proc.stdout.readline().strip() or 0)
-        return self.proc.stdout.read(n) if n > 0 else b""
+        proc = self.proc
+        guard = threading.Timer(15, lambda: self._kill_proc(proc))
+        guard.daemon = True
+        guard.start()
+        try:
+            proc.stdin.write(line.encode() + b"\n")
+            proc.stdin.flush()
+            head = proc.stdout.readline()
+            if not head:
+                raise RuntimeError("connexion à la tablette interrompue")
+            n = int(head.strip() or 0)
+            data = proc.stdout.read(n) if n > 0 else b""
+            if len(data) < n:
+                raise RuntimeError("réponse incomplète de la tablette")
+            return data
+        finally:
+            guard.cancel()
 
     def _read_vue(self):
         """vue.json lu juste avant l'image : l'image est posée avec la correspondance de son instant.
@@ -108,6 +143,8 @@ class ScreenStream:
                 self.frame_vue = {k: v[k] for k in ("pageId", "map", "mask", "cell", "angle") if k in v}
         except ValueError:
             pass
+        except RuntimeError:
+            raise
 
     def _full(self):
         self._read_vue()
@@ -159,6 +196,7 @@ class ScreenStream:
         vue_settle = 0.0                          # image complète quand la vue n'a plus bougé depuis 1,2 s
         while time.time() - self.last_use < 15:   # s'arrête 15 s après le dernier client
             now = time.time()
+            self.beat = now
             try:
                 pen = self.pen
                 touching = bool(pen and pen.touching)
