@@ -46,6 +46,7 @@ ssh root@10.11.99.1 /home/root/xovi/start      # active les mods (l'interface re
 | [Installation](docs/INSTALLATION.md) | PC, tablette, xovi, mise à jour du système |
 | [Utilisation](docs/UTILISATION.md) | Studio, menu du crayon, formes, bouton 4 cases, carnets liés |
 | [Découvertes](docs/DECOUVERTES.md) | tout ce qu'on a appris sur xochitl 3.30 (format, écran, formes, couleurs…) |
+| [Extension native](docs/EXTENSION-NATIVE.md) | défrichage : créer un trait sans stylet (adresses, disposition en mémoire) |
 | [Architecture](docs/ARCHITECTURE.md) | comment les morceaux communiquent |
 | [Sécurité](docs/SECURITE.md) | risques, ce qui est modifié, comment tout retirer |
 | [Feuille de route](docs/FEUILLE-DE-ROUTE.md) | idées, pistes |
