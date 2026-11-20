@@ -242,7 +242,17 @@ class Envoi:
             time.sleep(1.5)                              # bandeau de titre, rendu : affichage stabilisé
         if e.get("essais", 0) and e.get("kind") == "highlight" and self._already_there(e, n):
             return self._done(e, "déjà présent sur la tablette")
-        cmd = {"action": "marks", "page": item["pages"][n]["id"], "pen": e["pen"], "segs": e["segs"]}
+        pid = item["pages"][n]["id"]
+        if e.get("kind") == "highlight" and e.get("rects"):
+            # d'abord le surlignage accroché au texte, tracé sur place (rapide, vrai surlignage de la tablette) ;
+            # ligne hors de l'écran ou sous l'interface : méthode du gabarit (droites copiées), qui marche partout
+            ok, msg = tablet.formes_run({"action": "snapmarks", "page": pid, "tool": 18,
+                                         "argb": e["pen"].get("argb"), "rects": e["rects"]})
+            if ok:
+                return self._done(e, msg)
+            if msg == "autre page affichée":
+                return self._note(e, f"l'ouverture de la page {n + 1} sur la tablette")
+        cmd = {"action": "marks", "page": pid, "pen": e["pen"], "segs": e["segs"]}
         ok, msg = tablet.formes_run(cmd)
         if ok:
             self._done(e, msg)

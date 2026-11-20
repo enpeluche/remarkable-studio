@@ -67,7 +67,7 @@ Item {
         result(false, msg);
     }
     function run(c) {
-        if (c.action === "marks" || c.action === "build") cmdId = c.id;
+        if (c.action === "marks" || c.action === "build" || c.action === "snapmarks") cmdId = c.id;
         if (c.action === "place") {
             spec = c; dragging = false; status = ""; ellipseStep = 0;
             log("placement " + c.shape);
@@ -113,6 +113,8 @@ Item {
             setPen(c);
         } else if (c.action === "marks") {
             marks(c);
+        } else if (c.action === "snapmarks") {
+            snapMarks(c);
         } else if (c.action === "image") {
             // insère une image (ex. formule LaTeX rendue sur le PC) dans la page
             const ctl = view.controller, L = ctl.currentLayer;
@@ -286,6 +288,69 @@ Item {
         log("marks : " + job.segs.length + " segments, outil " + p.tool);
         run2(job);
     }
+    // Surlignage accroché au texte, tracé directement sur les lignes : le stylet simulé passe sur chaque ligne avec
+    // le surligneur et « accrocher au texte » ; la tablette en fait un vrai surlignage de texte (calé sur les
+    // lettres, texte enregistré). Pas de gabarit. Seulement si chaque ligne est entièrement à l'écran et hors de
+    // toute interface (menu de la barre d'outils fermé d'abord) ; sinon échec « zone » : le PC passe par marks.
+    property var snapJob: null
+    function snapMarks(c) {
+        if (c.page && String(view.tileManager.pageId) !== String(c.page)) { result(false, "autre page affichée"); return; }
+        if (snapJob || job || pendingFile !== "") { result(false, "occupé"); return; }
+        const tb = findItem(it => typeof it.closeFoldout === "function" && "selectedTool" in it);
+        if (tb) { try { tb.closeFoldout(); } catch (e) {} }
+        snapJob = { c: c, step: 0 };
+        snapTimer.start();                         // laisser le menu se refermer avant de mesurer l'interface
+    }
+    function snapPrepare(c) {
+        const free = uiFreeChecker(12);
+        const strokes = [];
+        for (const r of c.rects || []) {
+            const x0 = r[0] + Math.min(4, r[2] * 0.1), x1 = r[0] + r[2] - Math.min(4, r[2] * 0.1), y = r[1] + r[3] / 2;
+            const A = view.tileManager.sceneToView(Qt.point(x0, y)), B = view.tileManager.sceneToView(Qt.point(x1, y));
+            const sA = layer.mapToItem(null, A.x, A.y), sB = layer.mapToItem(null, B.x, B.y);
+            const T = view.tileManager.sceneToView(Qt.point(r[0], r[1])), Bt = view.tileManager.sceneToView(Qt.point(r[0] + r[2], r[1] + r[3]));
+            const s0 = layer.mapToItem(null, T.x, T.y), s1 = layer.mapToItem(null, Bt.x, Bt.y);
+            const bx = Math.min(s0.x, s1.x), by = Math.min(s0.y, s1.y);
+            if (!free(bx, by, Math.abs(s1.x - s0.x), Math.abs(s1.y - s0.y)))
+                return { error: "ligne hors de l'écran ou sous l'interface" };
+            strokes.push({ hold: 0, pts: [[A.x, A.y], [B.x, B.y]] });
+        }
+        return strokes.length ? { strokes: strokes } : { error: "rien à tracer" };
+    }
+    Timer {
+        id: snapTimer
+        interval: 350
+        repeat: true
+        onTriggered: {
+            const sj = f.snapJob;
+            if (!sj) { stop(); return; }
+            const p = f.view.toolSettings.activePen;
+            if (sj.step === 0) {
+                const prep = f.snapPrepare(sj.c);
+                if (prep.error) { stop(); f.snapJob = null; f.result(false, "zone : " + prep.error); return; }
+                sj.restore = { tool: p.tool, color: p.color, colorCode: p.colorCode >>> 0, thickness: p.thickness,
+                               snap: p.snapHighlighterToText };
+                p.tool = sj.c.tool || 18;
+                if (sj.c.argb) { p.color = Line.ArgbCode; p.colorCode = sj.c.argb; }
+                try { p.snapHighlighterToText = true; } catch (e) {}
+                sj.n = prep.strokes.length;
+                sj.step = 1;
+                f.inject(prep.strokes, false);
+                f.log("surlignage accroché : " + sj.n + " ligne(s)");
+            } else if (sj.step === 1) {
+                // tracé lancé par launcher quand le stylet est loin ; fini après la durée estimée
+                if (f.pendingFile !== "" || Date.now() - f.launchedAt < f.estimate + 1200) return;
+                stop();
+                const r = sj.restore;
+                p.tool = r.tool; p.color = r.color; p.colorCode = r.colorCode; p.thickness = r.thickness;
+                try { p.snapHighlighterToText = r.snap; } catch (e) {}
+                f.snapJob = null;
+                f.status = "";
+                f.result(true, sj.n + " ligne(s) surlignée(s), accrochées au texte");
+            }
+        }
+    }
+
     // Réglage du crayon depuis le PC (remplace penSet de xovi-message-broker, source de plantages)
     function setPen(c) {
         if (!isWriting()) return;
@@ -338,16 +403,7 @@ Item {
         // emplacement libre (écran physique) pour le gabarit : droite de 400 px ou cercle de rayon 60.
         // Il doit être vide de traits ET de toute interface (barre d'outils, menus… : en paysage la barre
         // d'outils occupe un bord de l'écran physique), sinon le trait injecté actionnerait l'interface.
-        const mk = uiMask(), cols = Math.ceil(1404 / maskCell);
-        const bits = [];
-        for (const ch of mk.hex) { const n = parseInt(ch, 16); bits.push(n >> 3 & 1, n >> 2 & 1, n >> 1 & 1, n & 1); }
-        const uiFree = (x0, y0, w, h) => {
-            if (x0 < 20 || y0 < 20 || x0 + w > 1384 || y0 + h > 1852) return false;
-            for (let y = Math.floor((y0 - 30) / maskCell); y <= Math.floor((y0 + h + 30) / maskCell); y++)
-                for (let x = Math.floor((x0 - 30) / maskCell); x <= Math.floor((x0 + w + 30) / maskCell); x++)
-                    if (x >= 0 && y >= 0 && x < cols && bits[y * cols + x]) return false;
-            return true;
-        };
+        const uiFree = uiFreeChecker();
         const spots = [];
         // milieu de l'écran d'abord : aux bords apparaissent bandeau de titre (à l'ouverture d'un document) et menus,
         // que le tracé simulé toucherait (constaté : gabarit jamais tracé)
@@ -666,7 +722,7 @@ Item {
     Timer { id: clearMsg; interval: 2500; onTriggered: f.status = "" }
     property int estimate: 0
     function busy() {
-        return pendingFile !== "" || job !== null || tplTimer.running || grouping.running || delTimer.running
+        return pendingFile !== "" || job !== null || snapJob !== null || tplTimer.running || grouping.running || delTimer.running
                || Date.now() < launchedAt + estimate + 3000;
     }
     property double launchedAt: 0
@@ -685,8 +741,9 @@ Item {
             const p = f.pendingFile;
             f.pendingFile = "";
             exe.executeCommand("/bin/sh", ["-c", "/home/root/xovi/formes/trace.sh '" + p + "' >/dev/null 2>&1 &"]);
-            f.status = "Préparation du gabarit…";
             f.launchedAt = Date.now();
+            if (!f.pendingIsTemplate) { f.status = "Surlignage…"; return; }    // surlignage direct (snapTimer)
+            f.status = "Préparation du gabarit…";
             tplTimer.tries = 0;
             tplTimer.start();
         }
@@ -809,6 +866,20 @@ Item {
     // ---- masque de l'interface (barre d'outils, menus, indicateurs…) : cases de 24 px de l'écran physique
     //      couvertes par un élément dessiné qui n'appartient pas au contenu de la page
     readonly property int maskCell: 24
+    // (x0, y0, w, h) en pixels de l'écran physique -> vrai si la zone est à l'écran et loin de toute interface
+    function uiFreeChecker(margin) {
+        const m = margin === undefined ? 30 : margin;
+        const mk = uiMask(), cols = Math.ceil(1404 / maskCell);
+        const bits = [];
+        for (const ch of mk.hex) { const n = parseInt(ch, 16); bits.push(n >> 3 & 1, n >> 2 & 1, n >> 1 & 1, n & 1); }
+        return (x0, y0, w, h) => {
+            if (x0 < 20 || y0 < 20 || x0 + w > 1384 || y0 + h > 1852) return false;
+            for (let y = Math.floor((y0 - m) / maskCell); y <= Math.floor((y0 + h + m) / maskCell); y++)
+                for (let x = Math.floor((x0 - m) / maskCell); x <= Math.floor((x0 + w + m) / maskCell); x++)
+                    if (x >= 0 && y >= 0 && x < cols && bits[y * cols + x]) return false;
+            return true;
+        };
+    }
     function uiMask() {
         const cols = Math.ceil(1404 / maskCell), rows = Math.ceil(1872 / maskCell);
         const bits = new Array(cols * rows).fill(0);

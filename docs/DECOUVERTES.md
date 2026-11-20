@@ -199,3 +199,15 @@ entrée (`… & P=$!; read _; kill $P`), sinon elles s'accumulent.
   l'affichage, tracer les gabarits au milieu de l'écran, et réessayer à un autre emplacement.
 - **Carnet en paysage** : `.content` a `"orientation": "landscape"` ; la page fait alors 1872 × 1404 unités, centrée
   en x = 0 (comme un PDF en paysage), au lieu de 1404 × 1872.
+- **Surlignage accroché au texte par le stylet simulé** : avec `activePen.tool = 18` (Highlighterv2) et
+  `snapHighlighterToText = true`, un trait injecté le long d'une ligne devient un vrai surlignage de texte
+  (`GlyphRange`, texte enregistré, calé sur les lettres) : pas de gabarit, ~1 s par ligne, imprécision du tracé
+  sans effet. Condition : la ligne entièrement à l'écran et hors de toute interface (menu de la barre d'outils
+  refermé d'abord : `closeFoldout()` de la barre).
+- **Créer un trait sans stylet : impossible depuis le QML (3.30)**. `SceneController.addDrawingLine(stroke)`,
+  `highlightWithLine(stroke, snap)`, le signal `PenInputLineHandler.stroke(Line)` attendent un objet `Line`, qui
+  n'est créé que par le code compilé à partir du stylet : côté QML, `Line` n'expose que `lineLength()` et des
+  propriétés en lecture seule (`tool`, `pointCount`, `isHighlighter`, `isSelectionTool`, `isEraserTool`,
+  `hasExportedColor`, `boundingRect`). `cloneSelectedItems` renvoie une
+  `QList<std::shared_ptr<SceneItem>>` opaque (ni longueur ni contenu lisibles). Pistes restantes : une extension
+  xovi native (C++), ou écrire le fichier `.rm` d'une page quand le document est fermé.
