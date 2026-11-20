@@ -6,6 +6,9 @@
         points : [[x, y, largeur, pression], ...] en unités de page ; accroche : -1 = addDrawingLine (trait
         ordinaire), sinon highlightWithLine(trait, accroche) avec SceneController.SnapEnabled / SnapDisabled
         (surlignage, accroché au texte ou non)  -> "" si fait, sinon la raison
+     StudioNatif.effacer(controleur, outil, epaisseur, points, imageErasing)
+        gomme le long d'un trait (outil 6 : gomme, 8 : gomme de zone), comme la gomme du stylet :
+        eraseWithLine(trait, SceneController.ImageErasingEnabled / Disabled)  -> "" si fait, sinon la raison
 
    Aucune adresse codée en dur pour les appels : les méthodes addDrawingLine(Line), highlightWithLine(Line, …) et
    renderLineToTiles(Line) sont trouvées par leur nom dans le système de méthodes de Qt (métaobjets). La seule
@@ -79,6 +82,8 @@ static bool bon_programme() {
 // ---------------------------------------------------------------- objet exposé au QML
 class StudioNatif : public QObject {
     Q_OBJECT
+    QString remplir(RmLine &line, QObject *controleur, int outil, int couleur, uint argb, double epaisseur,
+                    const QVariantList &points) const;
 public:
     using QObject::QObject;
 
@@ -89,35 +94,29 @@ public:
         return QString();
     }
 
+    Q_INVOKABLE QString effacer(QObject *controleur, int outil, double epaisseur, const QVariantList &points,
+                                int imageErasing) {
+        if (outil != 6 && outil != 8) return QStringLiteral("outil de gomme attendu (6 ou 8)");
+        RmLine line{};
+        QString err = remplir(line, controleur, outil, 0, 0xFF000000u, epaisseur, points);
+        if (!err.isEmpty()) return err;
+        const int idx = controleur->metaObject()->indexOfMethod("eraseWithLine(Line,ImageErasing)");
+        if (idx < 0) return QStringLiteral("méthode eraseWithLine introuvable");
+        void *argv[] = {nullptr, &line, &imageErasing};
+        QMetaObject::metacall(controleur, QMetaObject::InvokeMetaMethod, idx, argv);
+        return QString();
+    }
+
     Q_INVOKABLE QString ajouterTrait(QObject *controleur, QObject *tuiles, int outil, int couleur, uint argb,
                                      double epaisseur, const QVariantList &points, int accroche) {
         const bool surligner = accroche >= 0;
-        const QString d = disponible();
-        if (!d.isEmpty()) return d;
-        if (!controleur) return QStringLiteral("contrôleur absent");
-        if (points.size() < 2 || points.size() > 20000) return QStringLiteral("nombre de points invalide");
+        RmLine line{};                                   // tout à zéro, liste Qt vide valide (compteur de références)
+        const QString err = remplir(line, controleur, outil, couleur, argb, epaisseur, points);
+        if (!err.isEmpty()) return err;
         const QMetaObject *mo = controleur->metaObject();
-        if (qstrcmp(mo->className(), "SceneController") != 0) return QStringLiteral("ce n'est pas un SceneController");
         const int idx = surligner ? mo->indexOfMethod("highlightWithLine(Line,SceneController::LineSnapMode)")
                                   : mo->indexOfMethod("addDrawingLine(Line)");
         if (idx < 0) return QStringLiteral("méthode introuvable");
-
-        RmLine line{};                                   // tout à zéro, liste Qt vide valide (compteur de références)
-        line.tool = outil;
-        line.color = couleur;
-        line.argb = argb;
-        line.thickness = epaisseur;
-        line.points.reserve(points.size());
-        for (const QVariant &v : points) {
-            const QVariantList p = v.toList();
-            if (p.size() < 2) return QStringLiteral("point invalide");
-            RmPoint q{};
-            q.x = float(p.value(0).toDouble());
-            q.y = float(p.value(1).toDouble());
-            q.width = quint16(qBound(0, p.value(2, 12).toInt(), 65535));
-            q.pressure = quint8(qBound(0, p.value(3, 100).toInt(), 255));
-            line.points.append(q);
-        }
         // appel par le système de méthodes : argv[0] = retour (void), argv[1] = &line (Line const&)
         void *argv[] = {nullptr, &line, &accroche};
         QMetaObject::metacall(controleur, QMetaObject::InvokeMetaMethod, idx, argv);
@@ -129,6 +128,33 @@ public:
         return QString();                                // ~RmLine : notre référence à la liste ; le document garde la sienne
     }
 };
+
+// remplissage commun d'un trait : contrôles, style, points [[x, y, largeur, pression], ...]
+QString StudioNatif::remplir(RmLine &line, QObject *controleur, int outil, int couleur, uint argb, double epaisseur,
+                             const QVariantList &points) const {
+    const QString d = disponible();
+    if (!d.isEmpty()) return d;
+    if (!controleur) return QStringLiteral("contrôleur absent");
+    if (qstrcmp(controleur->metaObject()->className(), "SceneController") != 0)
+        return QStringLiteral("ce n'est pas un SceneController");
+    if (points.size() < 2 || points.size() > 20000) return QStringLiteral("nombre de points invalide");
+    line.tool = outil;
+    line.color = couleur;
+    line.argb = argb;
+    line.thickness = epaisseur;
+    line.points.reserve(points.size());
+    for (const QVariant &v : points) {
+        const QVariantList p = v.toList();
+        if (p.size() < 2) return QStringLiteral("point invalide");
+        RmPoint q{};
+        q.x = float(p.value(0).toDouble());
+        q.y = float(p.value(1).toDouble());
+        q.width = quint16(qBound(0, p.value(2, 12).toInt(), 65535));
+        q.pressure = quint8(qBound(0, p.value(3, 100).toInt(), 255));
+        line.points.append(q);
+    }
+    return QString();
+}
 
 static StudioNatif *g_instance = nullptr;
 

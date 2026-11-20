@@ -211,6 +211,7 @@ label.chk { display: inline-flex; gap: 6px; align-items: center; font-size: 12.5
       <span class="hint" id="pentxt"></span>
     </div>
     <div class="slider"><span>Épaisseur</span><input type="range" id="thick" min="0" max="1000" value="400"><output id="thickOut">2.00</output></div>
+    <div class="slider"><span>Gomme</span><input type="range" id="esize" min="8" max="160" value="40"><output id="esizeOut">40 px</output></div>
     <div class="palette" id="palette"></div>
     <label class="chk" title="Pendant que le stylet survole une ligne de texte avec le surligneur, son épaisseur s'ajuste à la hauteur de la ligne (serveur du PC allumé)"><input type="checkbox" id="autohl"> Surligneur à la taille du texte</label>
   </section>
@@ -269,6 +270,7 @@ function status(t, ms = 4000) { $('#status').textContent = t; clearTimeout(statu
 // ================================================================ outils
 // icônes SVG 24 x 24 en currentColor (style Material arrondi, comme le site)
 const ICONS = {
+  erase: 'M16.24 3.56l4.95 4.94c.78.79.78 2.05 0 2.84L12 20.53a4.008 4.008 0 0 1-5.66 0L2.81 17c-.78-.79-.78-2.05 0-2.84l10.6-10.6c.79-.78 2.05-.78 2.83 0M4.22 15.58l3.54 3.53c.78.79 2.04.79 2.83 0l3.53-3.53-4.95-4.95-4.95 4.95z',
   view: 'M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z',
   free: 'M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a.996.996 0 0 0 0-1.41l-2.34-2.34a.996.996 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z',
   line: 'M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 10H3V8h2v4h2V8h2v4h2V8h2v4h2V8h2v4h2V8h2v8z',
@@ -281,7 +283,7 @@ const ICONS = {
   formula: 'M18 4H6v2l6.5 6L6 18v2h12v-3h-7l5-5-5-5h7V4z',
 };
 const TOOLS = [
-  ['view', 'Voir'], ['free', 'Libre'], ['line', 'Règle'], ['rect', 'Rectangle'], ['circle', 'Cercle'], ['ellipse', 'Ellipse'],
+  ['view', 'Voir'], ['free', 'Crayon'], ['erase', 'Gomme'], ['line', 'Règle'], ['rect', 'Rectangle'], ['circle', 'Cercle'], ['ellipse', 'Ellipse'],
   ['grid', 'Grille'], ['polygon', 'Polygone'], ['axes', 'Repère'], ['formula', 'Formule'],
 ];
 let tool = 'view';
@@ -290,8 +292,20 @@ for (const [id, name] of TOOLS) {
   b.innerHTML = `<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICONS[id]}"/></svg><span>${name}</span>`; b.title = name;
   b.onclick = () => setTool(id); $('#tools').append(b);
 }
-function setTool(t) {
+// Correspondance avec la tablette : Crayon <-> crayon d'écriture actif, Gomme <-> gomme (outil 6 ou 8).
+// Choisi dans le Studio : appliqué à la tablette ; choisi sur la tablette : suivi par le Studio (refreshDoc).
+var lastWriting = 17, syncLock = 0;
+const isEraserTool = t => t === 6 || t === 8;
+// crayon connu (déclaré plus bas avec let : au tout premier appel, pas encore initialisé -> null)
+const penNow = () => { try { return pen; } catch (e) { return null; } };
+function setTool(t, fromTablet) {
+  const cp = penNow();
+  if (!fromTablet && cp) {
+    if (t === 'erase' && !isEraserTool(cp.tool)) { syncLock = Date.now() + 3000; applyPen({ tool: 6 }); }
+    if (t === 'free' && isEraserTool(cp.tool)) { syncLock = Date.now() + 3000; applyPen({ tool: lastWriting }); }
+  }
   tool = t;
+  $('#esize').closest('.slider').hidden = t !== 'erase';
   if (typeof panelFor !== 'undefined' && panelFor[t]) togglePanel(panelFor[t], true);
   document.querySelectorAll('.tool').forEach(b => b.classList.toggle('on', b.dataset.t === t));
   if (typeof drawFbox === 'function') { if (t !== 'formula') fx = null; drawFbox(); }
@@ -334,7 +348,7 @@ document.querySelectorAll('.float').forEach(el => {
 });
 { const open = store('rm-studio-open') || { pPen: true }; for (const id of ['pPen', 'pShapes', 'pTex', 'pNotes']) if (open[id]) togglePanel(id, true); }
 // choisir un outil de forme ou la formule ouvre la palette correspondante
-var panelFor = { grid: 'pShapes', polygon: 'pShapes', axes: 'pShapes', formula: 'pTex' };
+var panelFor = { free: 'pPen', erase: 'pPen', grid: 'pShapes', polygon: 'pShapes', axes: 'pShapes', formula: 'pTex' };
 
 // ---- mode Document : toutes les pages du document ouvert sur la tablette
 var mode = 'doc', docState = {};
@@ -358,6 +372,7 @@ async function refreshDoc(force) {
   if (force || s.page !== docState.page || s.ver !== docState.ver || s.doc !== docState.doc) loadCurrentPage(s);
   const scroll = force || s.page !== docState.page || s.doc !== docState.doc;
   docState = s;
+  syncFromTablet(s.pen);
   placeLive();
   box.querySelectorAll('.docpage').forEach(d => d.classList.toggle('cur', +d.dataset.i === s.page));
   if (scroll) { const c = box.querySelector('.docpage.cur'); if (c) c.scrollIntoView({ block: 'center' }); }
@@ -371,6 +386,14 @@ document.addEventListener('visibilitychange', () => {
 });
 refreshDoc(true);
 
+function syncFromTablet(p) {
+  if (!p || !p.doc || Date.now() < syncLock) return;
+  try { pen = p; showPen(); } catch (e) {}
+  const er = isEraserTool(p.tool);
+  if (!er && p.tool !== 11) lastWriting = p.tool;
+  if (tool === 'free' && er) setTool('erase', true);
+  else if (tool === 'erase' && !er && p.tool !== 11) setTool('free', true);
+}
 // ---- fusion : l'écran en direct posé sur la zone que la tablette affiche, le reste = pages enregistrées
 var pageBounds = null, liveEl = null, M = null, kScene = 1;
 var frameVue = {};             // page et correspondance écran -> page au moment où l'image en direct a été capturée
@@ -643,7 +666,8 @@ es.onmessage = e => {
 const PENS = [[17,'Fineliner'],[15,'Bille'],[16,'Marqueur'],[14,'Crayon'],[13,'Porte-mine'],[12,'Pinceau'],[21,'Calligr.'],[18,'Surligneur']];
 for (const [id, n] of PENS) {
   const b = document.createElement('button'); b.textContent = n; b.dataset.id = id;
-  b.onclick = () => applyPen({ tool: id }); $('#pens').append(b);
+  b.onclick = () => { lastWriting = id; syncLock = Date.now() + 3000; applyPen({ tool: id }); if (tool !== 'free') setTool('free', true); };
+  $('#pens').append(b);
 }
 const tToSlider = t => Math.round(Math.log(t / 0.3) / Math.log(15 / 0.3) * 1000);
 const sliderToT = v => Math.round(0.3 * Math.pow(15 / 0.3, v / 1000) * 100) / 100;
@@ -665,6 +689,11 @@ async function applyPen(fields) {
   try { const r = await post('/api/pen', fields); if (r.pen) { pen = r.pen; showPen(); } } catch (e) { status('crayon : serveur injoignable'); }
 }
 $('#col').addEventListener('change', e => applyPen({ argb: argbOf(e.target.value) }));
+// taille de la gomme du Studio (pixels de l'écran de la tablette), mémorisée
+try { const v = +localStorage.getItem('studio-esize'); if (v) $('#esize').value = v; } catch (e) {}
+$('#esizeOut').textContent = $('#esize').value + ' px';
+$('#esize').addEventListener('input', e => { $('#esizeOut').textContent = e.target.value + ' px';
+  try { localStorage.setItem('studio-esize', e.target.value); } catch (err) {} });
 $('#hex').addEventListener('change', e => { const v = e.target.value.trim(); if (/^#?[0-9a-f]{6}$/i.test(v)) applyPen({ argb: argbOf(v[0] === '#' ? v : '#' + v) }); });
 $('#thick').addEventListener('input', e => $('#thickOut').textContent = sliderToT(+e.target.value).toFixed(2));
 $('#thick').addEventListener('change', e => applyPen({ thickness: sliderToT(+e.target.value) }));
@@ -719,9 +748,11 @@ function shapePaths(t, a, b, minor) {
 function drawDraft() {
   dctx.clearRect(0, 0, W, H);
   if (!drag) return;
-  dctx.strokeStyle = '#c0392b'; dctx.lineWidth = 3; dctx.lineCap = dctx.lineJoin = 'round';
-  dctx.setLineDash(drag.t === 'free' ? [] : [12, 8]);
-  const paths = drag.t === 'free' ? [drag.pts] : shapePaths(drag.t, drag.a, drag.b, drag.minor);
+  const er = drag.t === 'erase';
+  dctx.strokeStyle = er ? 'rgba(120, 120, 120, .35)' : '#c0392b'; dctx.lineWidth = er ? +$('#esize').value : 3;
+  dctx.lineCap = dctx.lineJoin = 'round';
+  dctx.setLineDash(drag.t === 'free' || er ? [] : [12, 8]);
+  const paths = drag.t === 'free' || er ? [drag.pts] : shapePaths(drag.t, drag.a, drag.b, drag.minor);
   for (const p of paths) { dctx.beginPath(); p.forEach((q, i) => i ? dctx.lineTo(q[0], q[1]) : dctx.moveTo(q[0], q[1])); dctx.stroke(); }
 }
 const minorOf = (d, p) => { const ang = Math.atan2(d.b[1] - d.a[1], d.b[0] - d.a[0]);
@@ -749,7 +780,7 @@ dv.addEventListener('pointermove', e => {
   if (!drag) return;
   const p = toScreen(e); if (!p) return;
   if (drag.step === 1) { drag.minor = minorOf(drag, p); drawDraft(); return; }
-  if (drag.t === 'free') { const q = drag.pts[drag.pts.length - 1]; if (Math.hypot(p[0] - q[0], p[1] - q[1]) > 3) drag.pts.push(p); }
+  if (drag.t === 'free' || drag.t === 'erase') { const q = drag.pts[drag.pts.length - 1]; if (Math.hypot(p[0] - q[0], p[1] - q[1]) > 3) drag.pts.push(p); }
   else drag.b = p;
   drawDraft();
 });
@@ -762,9 +793,10 @@ dv.addEventListener('pointerup', async e => {
   }
   const d = drag; drag = null;
   setTimeout(drawDraft, 2500);            // l'aperçu reste le temps que l'écran se mette à jour
-  if (d.t === 'free') {
+  if (d.t === 'free' || d.t === 'erase') {
     if (d.pts.length < 2) { drawDraft(); return; }
-    const r = await post('/api/draw', { strokes: [d.pts.map(p => [Math.round(p[0]), Math.round(p[1])])] });
+    const r = await post('/api/draw', { strokes: [d.pts.map(p => [Math.round(p[0]), Math.round(p[1])])], doc: docState.doc,
+                                        page: docState.page, mode: d.t === 'erase' ? 'gomme' : 'trait', taille: +$('#esize').value });
     if (!r.ok) status('Échec : ' + (r.error || 'erreur'));
     return;
   }

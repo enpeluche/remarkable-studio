@@ -819,7 +819,25 @@ class Handler(BaseHTTPRequestHandler):
                     if cur.get("doc") != body.get("doc") or (body.get("page") is not None and cur.get("page") != body.get("page")):
                         return self.json({"ok": False, "error": "la tablette n'affiche pas la page prévue",
                                           "current": {"doc": cur.get("doc"), "name": cur.get("name"), "page": cur.get("page")}}, 409)
-                hold =min(max(int(body.get("hold_ms") or 0), 0), 3000)
+                # d'abord l'extension native (trait instantané, ou gomme) ; sans elle : stylet simulé (crayon seulement)
+                mode = "gomme" if body.get("mode") == "gomme" else "trait"
+                raw = [[[round(x, 1), round(y, 1)] for x, y in
+                        [(min(max(float(x), 0), draw.W - 1), min(max(float(y), 0), draw.H - 1)) for x, y in st[:5000]]]
+                       for st in strokes if len(st) >= 2]
+                cmd = {"action": "dessin", "traits": raw, "mode": mode,
+                       "taille": min(max(float(body.get("taille") or 30), 4), 300)}
+                it = items.get(body.get("doc"))
+                if it and body.get("page") is not None and 0 <= int(body["page"]) < len(it["pages"]):
+                    cmd["page"] = it["pages"][int(body["page"])]["id"]
+                self.screen.boost(3)
+                ok, msg = tablet.formes_run(cmd, timeout=15)
+                if ok:
+                    return self.json({"ok": True, "natif": True, "count": len(raw), "message": msg})
+                if msg != "extension native absente":
+                    return self.json({"ok": False, "error": msg})
+                if mode == "gomme":
+                    return self.json({"ok": False, "error": "la gomme depuis le PC demande l'extension native"})
+                hold = min(max(int(body.get("hold_ms") or 0), 0), 3000)
                 for pts in clean:
                     self.injector.stroke(pts, hold_ms=hold)
                 return self.json({"ok": True, "count": len(clean)})

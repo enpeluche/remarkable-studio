@@ -67,7 +67,7 @@ Item {
         result(false, msg);
     }
     function run(c) {
-        if (c.action === "marks" || c.action === "build" || c.action === "snapmarks" || c.action === "natifTrait") cmdId = c.id;
+        if (c.action === "marks" || c.action === "build" || c.action === "snapmarks" || c.action === "natifTrait" || c.action === "dessin") cmdId = c.id;
         if (c.action === "place") {
             spec = c; dragging = false; status = ""; ellipseStep = 0;
             log("placement " + c.shape);
@@ -117,6 +117,8 @@ Item {
             snapMarks(c);
         } else if (c.action === "natifTrait") {
             natifTrait(c);
+        } else if (c.action === "dessin") {
+            dessin(c);
         } else if (c.action === "image") {
             // insère une image (ex. formule LaTeX rendue sur le PC) dans la page
             const ctl = view.controller, L = ctl.currentLayer;
@@ -372,6 +374,33 @@ Item {
         if (all.length) natifRepaint(all);
         return "";
     }
+    // Dessin et gomme depuis le Studio : c.traits = [[[x, y], ...], ...] en pixels de l'écran physique (comme l'image
+    // en direct) ; convertis ici dans le repère de la page (zoom, défilement, orientation de l'instant).
+    // c.mode : "trait" (crayon actif ; si c'est une gomme : gomme) ou "gomme" ; c.taille : largeur de gomme (px écran)
+    function dessin(c) {
+        if (c.page && String(view.tileManager.pageId) !== String(c.page)) { result(false, "autre page affichée"); return; }
+        if (!natifOk()) { result(false, "extension native absente"); return; }
+        const p = view.toolSettings.activePen;
+        const gomme = c.mode === "gomme" || p.tool === 6 || p.tool === 8;
+        const traits = (c.traits || []).map(t => t.map(q => { const l = layer.mapFromItem(null, q[0], q[1]); const r = toScene([l.x, l.y]); return [r.x, r.y]; }))
+                                       .filter(t => t.length >= 2);
+        if (!traits.length) { result(false, "rien à tracer"); return; }
+        let err = "";
+        if (gomme) {
+            // largeur de gomme : c.taille pixels d'écran -> unités de page (zoom de l'instant)
+            const s0 = toScene([0, 0]), s1 = toScene([c.taille || 30, 0]);
+            const w = Math.max(4, Math.round(Math.hypot(s1.x - s0.x, s1.y - s0.y)));
+            for (const t of traits) {
+                err = err || natif().effacer(view.controller, p.tool === 8 ? 8 : 6, 2, t.map(q => [q[0], q[1], w, 255]),
+                                             SceneController.ImageErasingDisabled);
+                natifRepaint(t);
+            }
+        } else {
+            err = natifLignes(traits, p.tool, p.color, p.colorCode, p.thickness);
+        }
+        log("dessin natif : " + traits.length + " trait(s), " + (gomme ? "gomme" : "crayon " + p.tool) + (err ? " — " + err : ""));
+        result(!err, err || traits.length + (gomme ? " trait(s) gommé(s)" : " trait(s) tracé(s)"));
+    }
     // c : {page, tool, color, argb, thickness, points: [[x, y, largeur, pression]...] (unités de page),
     //      accroche: absent = trait ordinaire, "texte" = surlignage accroché au texte, "libre" = surlignage libre}
     function natifTrait(c) {
@@ -467,9 +496,11 @@ Item {
 
     // Réglage du crayon depuis le PC (remplace penSet de xovi-message-broker, source de plantages)
     function setPen(c) {
-        if (!isWriting()) return;
         const p = view.toolSettings.activePen;
-        if (c.tool !== undefined && c.tool !== null) p.tool = c.tool;
+        // changer d'outil est toujours permis (crayon <-> gomme depuis le Studio) ; couleur et épaisseur : crayon seulement
+        const allowed = [12, 13, 14, 15, 16, 17, 18, 21, 6, 8];
+        if (c.tool !== undefined && c.tool !== null && allowed.indexOf(c.tool) >= 0) p.tool = c.tool;
+        if (!isWriting()) { vueTimer.restart(); return; }
         if (c.argb !== undefined && c.argb !== null) { p.color = Line.ArgbCode; p.colorCode = c.argb; }
         if (c.thickness !== undefined && c.thickness !== null) p.thickness = c.thickness;
         vueTimer.restart();
