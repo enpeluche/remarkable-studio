@@ -43,6 +43,8 @@ tester, et les règles à respecter. Pour le *pourquoi* technique (format, adres
 `installer.sh`, `desinstaller.sh`, `diagnostic.sh` (état complet en une connexion), `patch_couleurs.py`,
 `extraire_qml.py` (étudier le QML d'une nouvelle version), `test_formes.py` (test complet des formes sur la tablette), `test_perf.py` (temps de réponse du serveur, coût
 de l'image en direct du Studio, avec seuils).
+`analyse_moc.py` (métaobjets Qt du programme de la tablette : adresse d'une méthode, taille d'un type ; voir
+[EXTENSION-NATIVE.md](EXTENSION-NATIVE.md)).
 
 ## Synchronisation : chacun fonctionne sans l'autre
 

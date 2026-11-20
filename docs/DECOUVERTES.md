@@ -210,7 +210,8 @@ entrée (`… & P=$!; read _; kill $P`), sinon elles s'accumulent.
   propriétés en lecture seule (`tool`, `pointCount`, `isHighlighter`, `isSelectionTool`, `isEraserTool`,
   `hasExportedColor`, `boundingRect`). `cloneSelectedItems` renvoie une
   `QList<std::shared_ptr<SceneItem>>` opaque (ni longueur ni contenu lisibles). Pistes restantes : une extension
-  xovi native (C++), ou écrire le fichier `.rm` d'une page quand le document est fermé.
+  xovi native (C++ ; défrichage dans [EXTENSION-NATIVE.md](EXTENSION-NATIVE.md) : adresse de
+  `addDrawingLine`, disposition de `Line`), ou écrire le fichier `.rm` d'une page quand le document est fermé (fait).
 - **Écrire une page document fermé (vérifié)** : ajouter des blocs « trait » à la FIN du fichier (`SceneLineItemBlock`,
   parent = calque `0:11`, identifiant auteur 1 : compteur au-delà du plus grand du fichier, `left_id` = dernier
   élément du calque, `right_id` = 0:0) ; la tablette les affiche, les garde, et numérote ses traits suivants à leur
