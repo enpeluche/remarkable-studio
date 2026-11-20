@@ -46,6 +46,17 @@ Adresses relatives au début du programme (PIE : ajouter l'adresse de chargement
 
 Trait par défaut (code du programme) : `memset(trait, 0, 72)`, outil 9, ARGB `0xFF000000`, épaisseur 1,0.
 
+## Avancement
+
+- **Étape 1 — extension vide** (`tablette/natif/studio-natif.c`, `build.sh`) : compilée avec
+  `arm-linux-gnueabihf-gcc` (Ubuntu 22.04, GCC 11 ; glibc 2.35 < 2.43 de la tablette : compatible). Structure
+  identique aux extensions officielles (`_xovi_construct`, `_xovi_shouldLoad`, `EXTENSIONVERSION` en `.xovi_info`,
+  `LINKTABLENAMES`/`LINKTABLEVALUES` en `.xovi`). Garde-fou : ne se charge que dans xochitl ET si les octets du
+  début de `addDrawingLine` et de la table de chaînes de `SceneController` sont exactement ceux de la 3.30.0.111
+  (la copie patchée des couleurs libres ne diffère de l'original que de 24 octets en `0x952aa4`). Vérifié hors de
+  xochitl : la bibliothèque s'ouvre sur la tablette, refuse de se charger. Reste : l'essai dans xochitl
+  (redémarrage de l'interface, PIN).
+
 ## Ce qu'il resterait à faire
 
 1. **Chaîne de compilation** : compilateur ARM (`arm-linux-gnueabihf-g++`, absent du PC aujourd'hui) et en-têtes

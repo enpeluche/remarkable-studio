@@ -34,3 +34,4 @@ qml/
 .venv/
 __pycache__/
 *.pyc
+tablette/natif/*.so
