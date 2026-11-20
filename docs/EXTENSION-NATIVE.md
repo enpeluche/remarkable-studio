@@ -54,8 +54,9 @@ Trait par défaut (code du programme) : `memset(trait, 0, 72)`, outil 9, ARGB `0
   `LINKTABLENAMES`/`LINKTABLEVALUES` en `.xovi`). Garde-fou : ne se charge que dans xochitl ET si les octets du
   début de `addDrawingLine` et de la table de chaînes de `SceneController` sont exactement ceux de la 3.30.0.111
   (la copie patchée des couleurs libres ne diffère de l'original que de 24 octets en `0x952aa4`). Vérifié hors de
-  xochitl : la bibliothèque s'ouvre sur la tablette, refuse de se charger. Reste : l'essai dans xochitl
-  (redémarrage de l'interface, PIN).
+  xochitl : la bibliothèque s'ouvre sur la tablette, refuse de se charger. **Chargée dans xochitl le
+  2026-11-20** (copie dans `xovi/extensions.d/`, `xovi/start`, PIN) : « [studio-natif] chargée (base 0x485000),
+  addDrawingLine reconnue » ; interface normale.
 
 ## Ce qu'il resterait à faire
 
