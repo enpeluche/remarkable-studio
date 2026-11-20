@@ -58,6 +58,18 @@ Trait par défaut (code du programme) : `memset(trait, 0, 72)`, outil 9, ARGB `0
   2026-11-20** (copie dans `xovi/extensions.d/`, `xovi/start`, PIN) : « [studio-natif] chargée (base 0x485000),
   addDrawingLine reconnue » ; interface normale.
 
+- **Étape 2 — créer un trait** (`tablette/natif/studio-natif.cpp`) : objet QML `StudioNatif` (module
+  `net.studio.Natif 1.0`), méthode `ajouterTrait(contrôleur, tuiles, outil, couleur, argb, épaisseur, points,
+  accroche)`. Appels **par nom** dans le système de méthodes de Qt (`addDrawingLine(Line)`,
+  `highlightWithLine(Line,SceneController::LineSnapMode)`, `renderLineToTiles(Line)`) : plus d'adresse codée en
+  dur pour les appels. Trait construit avec une vraie `QList` Qt 6 (compteur de références : `addDrawingLine`
+  recopie le trait et partage la liste en incrémentant ce compteur — vérifié au désassembleur). Contrôle :
+  `QMetaType::fromName("Line").sizeOf() == 72`. Compilation contre les en-têtes de Qt 6.10.3 pour PC
+  (aqtinstall) et les bibliothèques copiées de la tablette. Garde-fou corrigé après un test : il vérifie le nom du
+  programme et que les adresses lues sont dans son segment (sinon lecture hors zone et plantage, constaté dans un
+  programme de test). Côté QML : commande `natifTrait` de `Formes.qml` ; sans l'extension, « extension native
+  absente ». Reste : l'essai dans xochitl.
+
 ## Ce qu'il resterait à faire
 
 1. **Chaîne de compilation** : compilateur ARM (`arm-linux-gnueabihf-g++`, absent du PC aujourd'hui) et en-têtes

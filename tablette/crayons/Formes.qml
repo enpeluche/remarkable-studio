@@ -67,7 +67,7 @@ Item {
         result(false, msg);
     }
     function run(c) {
-        if (c.action === "marks" || c.action === "build" || c.action === "snapmarks") cmdId = c.id;
+        if (c.action === "marks" || c.action === "build" || c.action === "snapmarks" || c.action === "natifTrait") cmdId = c.id;
         if (c.action === "place") {
             spec = c; dragging = false; status = ""; ellipseStep = 0;
             log("placement " + c.shape);
@@ -115,6 +115,8 @@ Item {
             marks(c);
         } else if (c.action === "snapmarks") {
             snapMarks(c);
+        } else if (c.action === "natifTrait") {
+            natifTrait(c);
         } else if (c.action === "image") {
             // insère une image (ex. formule LaTeX rendue sur le PC) dans la page
             const ctl = view.controller, L = ctl.currentLayer;
@@ -292,6 +294,31 @@ Item {
     // le surligneur et « accrocher au texte » ; la tablette en fait un vrai surlignage de texte (calé sur les
     // lettres, texte enregistré). Pas de gabarit. Seulement si chaque ligne est entièrement à l'écran et hors de
     // toute interface (menu de la barre d'outils fermé d'abord) ; sinon échec « zone » : le PC passe par marks.
+    // Extension native (tablette/natif) : traits créés sans stylet. Absente : null (rien ne change).
+    property var natifRef: undefined
+    function natif() {
+        if (natifRef === undefined) {
+            try {
+                natifRef = Qt.createQmlObject('import QtQuick; import net.studio.Natif 1.0; QtObject { function n() { return StudioNatif; } }', f).n();
+            } catch (e) { natifRef = null; }
+        }
+        return natifRef;
+    }
+    // c : {page, tool, color, argb, thickness, points: [[x, y, largeur, pression]...] (unités de page),
+    //      accroche: absent = trait ordinaire, "texte" = surlignage accroché au texte, "libre" = surlignage libre}
+    function natifTrait(c) {
+        if (c.page && String(view.tileManager.pageId) !== String(c.page)) { result(false, "autre page affichée"); return; }
+        const n = natif();
+        if (!n) { result(false, "extension native absente"); return; }
+        const d = n.disponible();
+        if (d) { result(false, "extension native : " + d); return; }
+        let mode = -1;
+        if (c.accroche === "texte") mode = SceneController.SnapEnabled;
+        else if (c.accroche === "libre") mode = SceneController.SnapDisabled;
+        const err = n.ajouterTrait(view.controller, view.tileManager, c.tool, c.color === undefined ? 9 : c.color,
+                                   c.argb === undefined ? 4278190080 : c.argb, c.thickness || 2, c.points, mode);
+        result(err === "", err || "trait ajouté (natif)");
+    }
     property var snapJob: null
     function snapMarks(c) {
         if (c.page && String(view.tileManager.pageId) !== String(c.page)) { result(false, "autre page affichée"); return; }

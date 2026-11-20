@@ -35,3 +35,4 @@ qml/
 __pycache__/
 *.pyc
 tablette/natif/*.so
+tablette/natif/*.moc
