@@ -223,3 +223,6 @@ entrée (`… & P=$!; read _; kill $P`), sinon elles s'accumulent.
 - **Document ouvert ou fermé** : pour un PDF / EPUB, le journal de xochitl écrit « worker on <uid> now running »
   à l'ouverture et « … now exiting » à la fermeture (rien pour un carnet). Le journal est gardé en mémoire et
   court : sans aucune trace, ne pas conclure.
+- **Gomme sans stylet** : `SceneController.eraseWithLine(Line, ImageErasing)` avec un trait d'outil 6 (gomme) ou 8
+  (gomme de zone). La largeur effacée vaut la largeur des points / 4 (comme le surligneur) ; l'épaisseur du trait
+  n'y change rien (vérifié : 40 → ~15 px effacés, 120 → ~33 px ; avec largeur = 4 × voulu, 40 px demandés → 40 px).

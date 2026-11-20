@@ -84,6 +84,12 @@ Trait par défaut (code du programme) : `memset(trait, 0, 72)`, outil 9, ARGB `0
   pinceau 30, surligneur 120). Repli automatique sur l'ancienne méthode si l'extension est absente.
   `outils/test_formes.py` : 7 / 7 par le chemin natif (paysage) ; barré du titre depuis le PC vérifié.
 
+- **Étape 4 — Studio miroir de la tablette** : outils « Crayon » et « Gomme » synchronisés dans les deux sens
+  (choisis sur le PC : appliqués à la tablette ; choisis sur la tablette : suivis par le Studio en ~1 s), panneau
+  du crayon ouvert avec l'outil, dessin à la souris instantané (`dessin` dans `Formes.qml`, `addDrawingLine`) et
+  gomme (`StudioNatif.effacer` → `eraseWithLine`), taille de gomme réglable. Vérifié par l'utilisateur ; gomme
+  mesurée et ajustée.
+
 ## Ce qu'il resterait à faire
 
 1. **Chaîne de compilation** : compilateur ARM (`arm-linux-gnueabihf-g++`, absent du PC aujourd'hui) et en-têtes

@@ -387,9 +387,10 @@ Item {
         if (!traits.length) { result(false, "rien à tracer"); return; }
         let err = "";
         if (gomme) {
-            // largeur de gomme : c.taille pixels d'écran -> unités de page (zoom de l'instant)
+            // largeur de gomme : c.taille pixels d'écran -> unités de page (zoom de l'instant) ; la largeur des points
+            // vaut 4 x la largeur effacée (mesuré : comme pour le surligneur) ; l'épaisseur du trait n'y change rien
             const s0 = toScene([0, 0]), s1 = toScene([c.taille || 30, 0]);
-            const w = Math.max(4, Math.round(Math.hypot(s1.x - s0.x, s1.y - s0.y)));
+            const w = Math.max(8, Math.round(4 * Math.hypot(s1.x - s0.x, s1.y - s0.y)));
             for (const t of traits) {
                 err = err || natif().effacer(view.controller, p.tool === 8 ? 8 : 6, 2, t.map(q => [q[0], q[1], w, 255]),
                                              SceneController.ImageErasingDisabled);
