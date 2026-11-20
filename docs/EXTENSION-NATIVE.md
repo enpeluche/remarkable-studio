@@ -90,6 +90,12 @@ Trait par défaut (code du programme) : `memset(trait, 0, 72)`, outil 9, ARGB `0
   gomme (`StudioNatif.effacer` → `eraseWithLine`), taille de gomme réglable. Vérifié par l'utilisateur ; gomme
   mesurée et ajustée.
 
+- **Étape 5 — formules LaTeX en traits** (`formules.vector`, action `traitsRel` de `Formes.qml`) : LaTeX → DVI →
+  `dvisvgm --no-fonts` (chaque lettre est un tracé) → courbes aplaties → pour chaque lettre, contour + remplissage
+  en zigzag (lignes horizontales tous les 1,4 unités, enchaînées tant qu'elles se chevauchent : une chaîne ne
+  sort jamais de la lettre) ; feutre d'épaisseur 1,0 à la couleur du crayon. Formule d'essai : ~100 traits posés
+  en ~200 ms, regroupés en une étape d'annulation, lettres pleines. Sans l'extension : image, comme avant.
+
 ## Ce qu'il resterait à faire
 
 1. **Chaîne de compilation** : compilateur ARM (`arm-linux-gnueabihf-g++`, absent du PC aujourd'hui) et en-têtes

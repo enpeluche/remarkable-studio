@@ -798,6 +798,15 @@ class Handler(BaseHTTPRequestHandler):
                     if body.get("x") is not None and body.get("y") is not None:
                         pos = (min(max(float(body["x"]), 0), 1404), min(max(float(body["y"]), 0), 1872))
                         self.screen.boost(4)
+                        # d'abord en vrais traits (extension native : lettres pleines, nettes, effaçables), centrés
+                        # sur le point visé ; sans l'extension : image, comme avant
+                        traits, w, h = formules.vector(latex, display, scale)
+                        rel = [[[round(x - w / 2, 2), round(y - h / 2, 2)] for x, y in t] for t in traits]
+                        ok, msg = tablet.formes_run({"action": "traitsRel", "ancre": list(pos), "traits": rel}, timeout=30)
+                        if ok:
+                            return self.json({"ok": True, "natif": True, "traits": len(rel), "message": msg})
+                        if msg != "extension native absente":
+                            return self.json({"ok": False, "error": msg})
                     return self.json({"ok": True, **formules.send(latex, display, scale, pos)})
                 except (ValueError, RuntimeError) as e:
                     return self.json({"ok": False, "error": str(e)})

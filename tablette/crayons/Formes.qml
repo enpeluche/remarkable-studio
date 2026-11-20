@@ -67,7 +67,7 @@ Item {
         result(false, msg);
     }
     function run(c) {
-        if (c.action === "marks" || c.action === "build" || c.action === "snapmarks" || c.action === "natifTrait" || c.action === "dessin") cmdId = c.id;
+        if (c.action === "marks" || c.action === "build" || c.action === "snapmarks" || c.action === "natifTrait" || c.action === "dessin" || c.action === "traitsRel") cmdId = c.id;
         if (c.action === "place") {
             spec = c; dragging = false; status = ""; ellipseStep = 0;
             log("placement " + c.shape);
@@ -119,6 +119,8 @@ Item {
             natifTrait(c);
         } else if (c.action === "dessin") {
             dessin(c);
+        } else if (c.action === "traitsRel") {
+            traitsRel(c);
         } else if (c.action === "image") {
             // insère une image (ex. formule LaTeX rendue sur le PC) dans la page
             const ctl = view.controller, L = ctl.currentLayer;
@@ -278,14 +280,19 @@ Item {
             else lignes.push(pts);
         }
         const area = view.tileManager.viewToScene(Qt.rect(x0 - 14, y0 - 14, x1 - x0 + 28, y1 - y0 + 28));
-        const group = lignes.length > 1 && rectsIn(area) === "";
         const p = view.toolSettings.activePen;
-        const err = natifLignes(lignes, p.tool, p.color, p.colorCode, p.thickness);
+        placerLignes(lignes, { tool: p.tool, color: p.color, argb: p.colorCode, thickness: p.thickness }, area, t0);
+    }
+    // Ajoute des traits (unités de page) avec un style, puis les regroupe pour qu'« Annuler » les retire d'un coup
+    // (si la zone était vide au départ et qu'il y a plusieurs traits). area : zone de la forme (unités de page).
+    function placerLignes(lignes, st, area, t0) {
+        const group = lignes.length > 1 && rectsIn(area) === "";
+        const err = natifLignes(lignes, st.tool, st.color, st.argb, st.thickness);
         if (err) { status = "Forme : " + err; clearMsg.restart(); result(false, err); return; }
-        log("natif : " + lignes.length + " trait(s) en " + (Date.now() - t0) + " ms");
+        log("natif : " + lignes.length + " trait(s) en " + (Date.now() - (t0 || Date.now())) + " ms");
         if (group) {
-            grouping.job = { area: area, restore: null,
-                             natif: { lignes: lignes, tool: p.tool, color: p.color, argb: p.colorCode, thickness: p.thickness } };
+            grouping.job = { area: area, restore: null, natif: { lignes: lignes, tool: st.tool, color: st.color,
+                                                                 argb: st.argb, thickness: st.thickness } };
             grouping.saved = selectionTool();
             grouping.steps = lignes.length; grouping.phase = 0;
             grouping.start();
@@ -293,6 +300,21 @@ Item {
             status = "";
             result(true, lignes.length + " élément(s)");
         }
+    }
+    // Traits relatifs à un point de l'écran (formule LaTeX en traits) : c.ancre = [x, y] pixels de l'écran physique,
+    // c.traits = [[[dx, dy], ...], ...] en unités de page autour de ce point (repère de la page : la formule suit
+    // la page, pas l'écran) ; couleur du crayon actif (noir si ce n'est pas un crayon), feutre fin.
+    function traitsRel(c) {
+        if (c.page && String(view.tileManager.pageId) !== String(c.page)) { result(false, "autre page affichée"); return; }
+        if (!natifOk()) { result(false, "extension native absente"); return; }
+        const l = layer.mapFromItem(null, c.ancre[0], c.ancre[1]), o = toScene([l.x, l.y]);
+        const lignes = (c.traits || []).filter(t => t.length >= 2).map(t => t.map(q => [o.x + q[0], o.y + q[1]]));
+        if (!lignes.length) { result(false, "rien à tracer"); return; }
+        let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+        for (const t of lignes) for (const q of t) { x0 = Math.min(x0, q[0]); y0 = Math.min(y0, q[1]); x1 = Math.max(x1, q[0]); y1 = Math.max(y1, q[1]); }
+        const p = view.toolSettings.activePen, ecrit = isWriting();
+        placerLignes(lignes, { tool: 17, color: ecrit ? p.color : 0, argb: ecrit ? p.colorCode : 0xFF000000,
+                               thickness: c.epaisseur || 1.0 }, Qt.rect(x0 - 10, y0 - 10, x1 - x0 + 20, y1 - y0 + 20), Date.now());
     }
     // Annotations de texte (Studio) : segments donnés en unités de PAGE [x0, y0, x1, y1, largeur],
     // largeur > 0 = bande (surligneur) obtenue par l'étirement perpendiculaire du gabarit.

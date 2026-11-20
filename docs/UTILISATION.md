@@ -33,6 +33,11 @@
 - Raccourcis : `V` voir, `L` libre, `R` règle, `C` cercle, `E` ellipse, `G` grille, `P` polygone, `F` formule,
   `Entrée` placer la formule, `Échap` annuler.
 
+- **Formules LaTeX** : posées en vrais traits (lettres pleines, nettes à tout zoom, effaçables à la gomme, un
+  seul « Annuler »), à la couleur du crayon de la tablette ; en image si l'extension native n'est pas chargée.
+- **Crayon et Gomme** : dessin et gomme à la souris, instantanés sur la tablette ; l'outil choisi d'un côté
+  l'est aussi de l'autre.
+
 ## Bibliothèque (PC) — http://127.0.0.1:8765/
 
 - **Synchro automatique** : toutes les 10 s, seuls les fichiers modifiés sur la tablette sont recopiés ; la page
