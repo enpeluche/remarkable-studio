@@ -317,7 +317,17 @@ Item {
         else if (c.accroche === "libre") mode = SceneController.SnapDisabled;
         const err = n.ajouterTrait(view.controller, view.tileManager, c.tool, c.color === undefined ? 9 : c.color,
                                    c.argb === undefined ? 4278190080 : c.argb, c.thickness || 2, c.points, mode);
+        if (!err) natifRepaint(c.points);
         result(err === "", err || "trait ajouté (natif)");
+    }
+    // le trait ajouté n'est pas redessiné tout seul (constaté) : zone marquée « à redessiner » puis rafraîchie
+    function natifRepaint(points) {
+        let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+        for (const q of points) { x0 = Math.min(x0, q[0]); y0 = Math.min(y0, q[1]); x1 = Math.max(x1, q[0]); y1 = Math.max(y1, q[1]); }
+        const r = view.tileManager.sceneToView(Qt.rect(x0 - 40, y0 - 40, x1 - x0 + 80, y1 - y0 + 80));
+        const vp = findItem(it => typeof it.requestRepaintDirty === "function" && typeof it.markDirty === "function");
+        if (vp) { vp.markDirty(r); vp.requestRepaintDirty(); log("natif : zone redessinée " + r); }
+        else log("natif : pas de zone d'affichage trouvée");
     }
     property var snapJob: null
     function snapMarks(c) {
