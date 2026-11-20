@@ -68,7 +68,12 @@ Trait par défaut (code du programme) : `memset(trait, 0, 72)`, outil 9, ARGB `0
   (aqtinstall) et les bibliothèques copiées de la tablette. Garde-fou corrigé après un test : il vérifie le nom du
   programme et que les adresses lues sont dans son segment (sinon lecture hors zone et plantage, constaté dans un
   programme de test). Côté QML : commande `natifTrait` de `Formes.qml` ; sans l'extension, « extension native
-  absente ». Reste : l'essai dans xochitl.
+  absente ». **Validé dans xochitl le 2026-11-20** sur « Essai remarkable-studio » : deux traits
+  (feutre rouge 3 points, bleu 2 points) et un surlignage accroché au texte (« Essai remarkable », rose, à partir
+  d'une ligne approximative) créés sans stylet, affichés, annulables et rétablissables (historique normal),
+  enregistrés dans la page (`GlyphRange` avec son texte). Le trait ajouté n'est pas redessiné tout seul :
+  `Formes.qml` marque la zone et demande le rafraîchissement (`markDirty` + `requestRepaintDirty` de la zone
+  d'affichage).
 
 ## Ce qu'il resterait à faire
 
