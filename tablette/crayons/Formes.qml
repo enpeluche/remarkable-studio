@@ -246,6 +246,7 @@ Item {
         spec = null;
         if (!isWriting()) { status = "Choisissez d'abord un crayon"; clearMsg.restart(); result(false, "le crayon actif n'écrit pas (gomme, sélection)"); return; }
         const strokes = shapeStrokes(s, a, b);
+        if (natifOk()) { buildNatif(strokes); return; }
         const job = { segs: [], ellipses: [], area: null, group: false };
         for (const st of strokes) {
             if (st.ellipse) { job.ellipses.push(st.ellipse); continue; }
@@ -260,11 +261,54 @@ Item {
         if (!job.group) log("zone déjà occupée, pas de regroupement : " + before.substring(0, 120));
         run2(job);
     }
+    // Construction directe (extension native) : traits consécutifs bout à bout = une seule polyligne (rectangle,
+    // polygone, cercle : un trait, une étape d'annulation) ; plusieurs traits (grille, axes) : regroupés comme
+    // avant pour qu'« Annuler » retire la forme d'un coup (zone vide au départ).
+    function buildNatif(strokes) {
+        const t0 = Date.now(), lignes = [];
+        let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+        for (const st of strokes) {
+            for (const q of st.pts) { x0 = Math.min(x0, q[0]); y0 = Math.min(y0, q[1]); x1 = Math.max(x1, q[0]); y1 = Math.max(y1, q[1]); }
+            const pts = st.pts.map(q => { const r = toScene(q); return [r.x, r.y]; });
+            const last = lignes.length ? lignes[lignes.length - 1] : null;
+            if (last && Math.hypot(last[last.length - 1][0] - pts[0][0], last[last.length - 1][1] - pts[0][1]) < 0.01)
+                for (let i = 1; i < pts.length; i++) last.push(pts[i]);
+            else lignes.push(pts);
+        }
+        const area = view.tileManager.viewToScene(Qt.rect(x0 - 14, y0 - 14, x1 - x0 + 28, y1 - y0 + 28));
+        const group = lignes.length > 1 && rectsIn(area) === "";
+        const p = view.toolSettings.activePen;
+        const err = natifLignes(lignes, p.tool, p.color, p.colorCode, p.thickness);
+        if (err) { status = "Forme : " + err; clearMsg.restart(); result(false, err); return; }
+        log("natif : " + lignes.length + " trait(s) en " + (Date.now() - t0) + " ms");
+        if (group) {
+            grouping.job = { area: area, restore: null,
+                             natif: { lignes: lignes, tool: p.tool, color: p.color, argb: p.colorCode, thickness: p.thickness } };
+            grouping.saved = selectionTool();
+            grouping.steps = lignes.length; grouping.phase = 0;
+            grouping.start();
+        } else {
+            status = "";
+            result(true, lignes.length + " élément(s)");
+        }
+    }
     // Annotations de texte (Studio) : segments donnés en unités de PAGE [x0, y0, x1, y1, largeur],
     // largeur > 0 = bande (surligneur) obtenue par l'étirement perpendiculaire du gabarit.
     // Style imposé le temps de l'opération (c.pen), puis crayon de l'utilisateur restauré.
     function marks(c) {
         if (c.page && String(view.tileManager.pageId) !== String(c.page)) { log("marks : autre page affichée"); result(false, "autre page affichée"); return; }
+        if (natifOk() && c.segs && c.segs.length) {
+            const pen = c.pen || {}, band = c.segs.filter(g => (g[4] || 0) > 0), lines = c.segs.filter(g => !((g[4] || 0) > 0));
+            let err = "";
+            for (const g of band)                      // bande de surligneur : largeur de bande = 30 x épaisseur
+                err = err || natifLignes([[[g[0], g[1]], [g[2], g[3]]]], 18, 9, pen.argb || 0xFFFBF06A, g[4] / 30);
+            if (lines.length)
+                err = err || natifLignes(lines.map(g => [[g[0], g[1]], [g[2], g[3]]]), pen.tool || 17, 9,
+                                         pen.argb || 0xFF000000, pen.thickness || 2);
+            log("marks natif : " + c.segs.length + " segment(s)" + (err ? " — " + err : ""));
+            result(!err, err || c.segs.length + " élément(s)");
+            return;
+        }
         if (!isWriting()) { status = "Choisissez d'abord un crayon"; clearMsg.restart(); result(false, "le crayon actif n'écrit pas (gomme, sélection)"); return; }
         const p = view.toolSettings.activePen;
         const restore = { tool: p.tool, color: p.color, colorCode: p.colorCode >>> 0, thickness: p.thickness,
@@ -304,6 +348,30 @@ Item {
         }
         return natifRef;
     }
+    // Extension utilisable ? (vérifiée une fois : disponible() vide)
+    property var natifOkCache: undefined
+    function natifOk() {
+        if (natifOkCache === undefined) { const n = natif(); natifOkCache = !!n && !n.disponible(); }
+        return natifOkCache;
+    }
+    // largeur des points et pression d'un trait, par outil : médianes mesurées sur 27 000 traits du stylet
+    // (largeur = rapport x épaisseur) ; feutre par défaut
+    readonly property var natifStyle: ({ 17: [8, 206], 15: [6, 174], 14: [12, 244], 13: [8, 206], 16: [14.5, 255],
+                                         21: [5, 156], 18: [120, 254], 5: [120, 254], 12: [30, 239] })
+    // traits ajoutés directement (polylignes en unités de page) avec un style donné -> "" ou la raison
+    function natifLignes(lignes, tool, color, argb, thickness, accroche) {
+        const n = natif(), st = natifStyle[tool] || [8, 206];
+        const w = Math.max(1, Math.round(st[0] * thickness)), all = [];
+        for (const pts of lignes) {
+            const pp = pts.map(q => [q[0], q[1], w, st[1]]);
+            const err = n.ajouterTrait(view.controller, view.tileManager, tool, color, argb >>> 0, thickness, pp,
+                                       accroche === undefined ? -1 : accroche);
+            if (err) return err;
+            for (const q of pts) all.push(q);
+        }
+        if (all.length) natifRepaint(all);
+        return "";
+    }
     // c : {page, tool, color, argb, thickness, points: [[x, y, largeur, pression]...] (unités de page),
     //      accroche: absent = trait ordinaire, "texte" = surlignage accroché au texte, "libre" = surlignage libre}
     function natifTrait(c) {
@@ -332,6 +400,15 @@ Item {
     property var snapJob: null
     function snapMarks(c) {
         if (c.page && String(view.tileManager.pageId) !== String(c.page)) { result(false, "autre page affichée"); return; }
+        if (natifOk()) {
+            const lignes = (c.rects || []).map(r => [[r[0] + Math.min(4, r[2] * 0.1), r[1] + r[3] / 2],
+                                                      [r[0] + r[2] - Math.min(4, r[2] * 0.1), r[1] + r[3] / 2]]);
+            const err = lignes.length ? natifLignes(lignes, c.tool || 18, 9, c.argb || 0xFFFBF06A, 1, SceneController.SnapEnabled)
+                                      : "rien à tracer";
+            log("surlignage natif : " + lignes.length + " ligne(s)" + (err ? " — " + err : ""));
+            result(!err, err || lignes.length + " ligne(s) surlignée(s), accrochées au texte");
+            return;
+        }
         if (snapJob || job || pendingFile !== "") { result(false, "occupé"); return; }
         const tb = findItem(it => typeof it.closeFoldout === "function" && "selectedTool" in it);
         if (tb) { try { tb.closeFoldout(); } catch (e) {} }
@@ -694,6 +771,11 @@ Item {
                 f.log("regroupement : recollage raté (" + count() + "/" + steps + "), forme reconstruite sans regroupement");
                 f.restoreTool(saved);
                 const j = job;
+                if (j.natif) {                       // forme native : retracée directement
+                    const nn = j.natif, err = f.natifLignes(nn.lignes, nn.tool, nn.color, nn.argb, nn.thickness);
+                    f.result(!err, err || nn.lignes.length + " élément(s), non regroupés");
+                    return;
+                }
                 j.group = false;
                 f.build(j);
             } else if (phase === 4) {                // abandon : refaire ce qui a été annulé

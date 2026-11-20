@@ -9,3 +9,5 @@
 - Ne jamais committer de données personnelles (sauvegarde, notes.json, tablette.conf…) ni de fichiers de reMarkable.
 - Après toute modification du QML de la tablette : `outils/test_formes.py --effacer` sur une page de test.
   Le crayon actif est `toolSettings.activePen` (le bouton 4 cases active le crayon secondaire, pas `primaryPen`).
+- Traits sans stylet : extension `tablette/natif/` (chargée par xovi, PIN au redémarrage). `Formes.qml` l'utilise
+  en priorité et retombe sur gabarit / stylet simulé sans elle : garder les deux chemins fonctionnels.

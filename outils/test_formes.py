@@ -18,7 +18,7 @@ import time
 
 CMD = "/home/root/xovi/crayons/formes-cmd.json"
 VUE = "/home/root/xovi/formes/vue.json"
-ELEMS = re.compile(r"FORMES (\d+) éléments en (\d+) ms")
+ELEMS = re.compile(r"FORMES (?:natif : )?(\d+) (?:éléments|trait\(s\)) en (\d+) ms")
 
 # formes : (nom, commande build en coordonnées de l'écran physique, zone de contrôle [x, y, w, h] écran)
 FORMES = [
@@ -153,6 +153,7 @@ def main():
         erreurs = [l for l in log.splitlines() if re.search(r"introuvable|sélection du gabarit|erreur|abandonn|inattendu", l)]
         ok = bool(n) and apres is not None and apres >= 1 and outil == outil0 and not erreurs
         detail = f"{n} construits, {apres} dans la zone, crayon {outil}, {time.time() - t0:.1f} s"
+        detail += ", natif" if "FORMES natif :" in log else ", gabarit"
         if "forme regroupée" in log:
             detail += ", regroupée"
         elif "recollage raté" in log:

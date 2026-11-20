@@ -32,6 +32,7 @@ tester, et les règles à respecter. Pour le *pourquoi* technique (format, adres
 |---|---|
 | `xovi/*.qmd` | patchs QMLDiff ; chaque module charge un fichier QML de `crayons/` par un `Loader` rechargeable à chaud |
 | `crayons/Formes.qml` | dans chaque page : formes, surlignage (`marks`), réglage du crayon (`pen`), images, `vue.json` |
+| `natif/studio-natif.cpp` | extension xovi : créer des traits sans stylet (`StudioNatif.ajouterTrait`) ; utilisée en priorité par `Formes.qml` (formes, marques de texte, surlignage accroché au texte), repli sur le gabarit et le stylet simulé si elle est absente (autre version du système) — voir EXTENSION-NATIVE.md |
 | `crayons/PenMenu.qml` | ajouts au menu du crayon (épaisseur continue, couleurs libres, formes) |
 | `crayons/Quad.qml` | bouton 4 cases (3 crayons + gomme) |
 | `crayons/formes-etat.js` | état partagé (gabarits) — `.pragma library` : en cache jusqu'au redémarrage de l'interface |

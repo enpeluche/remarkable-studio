@@ -75,6 +75,15 @@ Trait par défaut (code du programme) : `memset(trait, 0, 72)`, outil 9, ARGB `0
   `Formes.qml` marque la zone et demande le rafraîchissement (`markDirty` + `requestRepaintDirty` de la zone
   d'affichage).
 
+- **Étape 3 — formes et marques par l'extension** (`Formes.qml`) : `buildNatif` construit chaque forme
+  directement (traits consécutifs bout à bout = une polyligne : rectangle, polygone, cercle, ellipse = **un seul
+  trait**, une étape d'annulation ; grille et axes : plusieurs traits regroupés comme avant) en ~50 ms, sans
+  gabarit ni stylet simulé ; `marks` (souligner, barrer, bande de surligneur) et `snapmarks` (surlignage
+  accroché au texte, ligne visible ou non) aussi. Largeur des points = rapport × épaisseur et pression, par
+  outil (médianes mesurées sur 27 000 traits : feutre 8, bille 6, crayon 12, marqueur 14,5, calligraphie 5,
+  pinceau 30, surligneur 120). Repli automatique sur l'ancienne méthode si l'extension est absente.
+  `outils/test_formes.py` : 7 / 7 par le chemin natif (paysage) ; barré du titre depuis le PC vérifié.
+
 ## Ce qu'il resterait à faire
 
 1. **Chaîne de compilation** : compilateur ARM (`arm-linux-gnueabihf-g++`, absent du PC aujourd'hui) et en-têtes
