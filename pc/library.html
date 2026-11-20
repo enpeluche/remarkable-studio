@@ -87,7 +87,11 @@ main { overflow: auto; padding: 18px 24px 60px; }
 .strip .mini div { aspect-ratio: 3/4; background: var(--paper); border: 2px solid transparent; border-radius: 4px; overflow: hidden; outline: 1px solid var(--line); }
 .strip .mini img { width: 100%; height: 100%; object-fit: contain; object-position: top; }
 .strip .mini.on div { border-color: var(--accent); }
-.pages { position: relative; flex: 1; overflow: auto; padding: 24px; display: flex; flex-direction: column; align-items: center; gap: 22px; }
+/* pages centrées par des marges automatiques (et non align-items: center) : une page zoomée plus large que la zone
+   déborderait des deux côtés, et sa partie gauche serait hors d'atteinte du défilement */
+.pages { position: relative; flex: 1; overflow: auto; padding: 24px; display: flex; flex-direction: column; align-items: flex-start; gap: 22px; }
+.pages > * { margin-inline: auto; }
+.viewer.nostrip .strip { display: none; }
 .page { background: #fff; box-shadow: 0 2px 12px rgba(0,0,0,.15); position: relative; width: var(--pw); min-height: 60px; flex: none; }
 .page img { display: block; width: 100%; }
 .page .ph { aspect-ratio: 1404/1872; display: flex; align-items: center; justify-content: center; color: #999; }
@@ -178,6 +182,7 @@ main { overflow: auto; padding: 18px 24px 60px; }
     </div>
     <div class="spacer"></div>
     <span class="sub">Page</span><input type="number" id="vpage" min="1"><span class="sub" id="vtotal"></span>
+    <button class="ctl" id="vstrip" title="Afficher ou cacher les miniatures (M)">Miniatures</button>
     <button class="ctl" id="zout" title="Dézoomer (-)">−</button>
     <button class="ctl" id="zfit" title="Ajuster (0)">Ajuster</button>
     <button class="ctl" id="zin" title="Zoomer (+)">+</button>
@@ -342,6 +347,15 @@ function go(id) { state.q = ''; $('#q').value = ''; location.hash = id === ROOT 
 let zoom = 1, cur = null, obs = null, lastN = -1;
 const baseWidth = () => Math.min($('#pages').clientWidth - 70, 900);
 function applyZoom() { $('#pages').style.setProperty('--pw', Math.round(baseWidth() * zoom) + 'px'); }
+// miniatures à gauche : affichées ou cachées (choix mémorisé), la page en cours reste en vue
+function setStrip(show) {
+  $('#viewer').classList.toggle('nostrip', !show);
+  $('#vstrip').classList.toggle('on', show);
+  try { localStorage.setItem('rmv-strip', show ? '1' : '0'); } catch (e) {}
+  if (cur) { const n = +$('#vpage').value - 1; applyZoom(); requestAnimationFrame(() => scrollToPage(n, 'instant')); }
+}
+$('#vstrip').onclick = () => setStrip($('#viewer').classList.contains('nostrip'));
+try { setStrip(localStorage.getItem('rmv-strip') !== '0'); } catch (e) { setStrip(true); }
 function openDoc(id, page) {
   const it = items[id]; if (!it) return;
   cur = it; $('#viewer').hidden = false; document.body.style.overflow = 'hidden';
@@ -461,6 +475,7 @@ document.addEventListener('keydown', e => {
     else if (e.key === '+' || e.key === '=') $('#zin').click();
     else if (e.key === '-') $('#zout').click();
     else if (e.key === '0') $('#zfit').click();
+    else if (e.key === 'm') $('#vstrip').click();
   } else if (e.key === '/') { e.preventDefault(); $('#q').focus(); }
   else if (e.key === 'Backspace' && state.folder !== ROOT) { const p = items[state.folder]?.parent; go(p && (items[p] || p === TRASH) ? p : ROOT); }
 });
