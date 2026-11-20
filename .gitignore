@@ -16,6 +16,7 @@ pc/reglages.json
 pc/cadrage.json
 pc/envoi.json
 pc/envoi/
+pc/sauvegardes-rm/
 *.rm
 *.metadata
 *.content

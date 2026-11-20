@@ -16,6 +16,7 @@ tester, et les règles à respecter. Pour le *pourquoi* technique (format, adres
 | `tablet.py` | état de la tablette, ouverture de page, liens, palette, commandes pour `Formes.qml` (`formes_cmd`) |
 | `annots.py` | recherche dans le texte, annotations d'une page (surlignages + texte, traits), recherche globale, commentaires (`notes.json`) |
 | `autohl.py` | surligneur à la taille du texte (survol du stylet → épaisseur) |
+| `rmedit.py` | écriture directe d'une page (.rm v6) : ajout de traits en fin de fichier (octets d'origine intacts), page vierge, vérification |
 | `envoi.py` | file d'envoi vers la tablette (marques, imports, liens, palette) : persistante, confirmée, rejouée |
 | `cadrage.py` | cadrage automatique des PDF (mesure des marges, `zoomFit` envoyé à `Formes.qml`, confirmation par la sauvegarde) |
 | `autosync.py` | synchro de la sauvegarde toutes les 10 s (fichiers modifiés seulement) |
@@ -52,7 +53,9 @@ de l'image en direct du Studio, avec seuils).
   Rien n'est perdu si la tablette est absente : c'est exécuté dès que possible, et retiré de la file seulement
   quand la tablette a confirmé (`resultat.json`, ou la copie synchronisée). Une marque demandée à l'instant ouvre
   la page sur la tablette ; un rattrapage attend que la page y soit affichée (jamais de changement de page
-  imposé). Studio et bibliothèque montrent la file (pastille, marques en pointillés, annulation).
+  imposé). Document **fermé** sur la tablette (PDF / EPUB) : la marque est écrite directement dans le fichier de
+  la page (`rmedit.py`), sans l'ouvrir, puis relue pour confirmation. Studio et bibliothèque montrent la file
+  (pastille, marques en pointillés, annulation).
 - **Ce qui n'existe que sur le PC** (commentaires des surlignages, `notes.json`) n'est jamais effacé par la
   tablette : un commentaire dont le surlignage a été supprimé reste visible (« surlignages supprimés ») et
   trouvable.
@@ -97,6 +100,7 @@ Lecture : `/` (bibliothèque), `/studio`, `/api/library`, `/api/library/version`
 | `pc/notes.json` | commentaires des surlignages |
 | `pc/reglages.json` | réglages (surligneur auto, cadrage auto) |
 | `pc/envoi.json`, `pc/envoi/` | file d'envoi et fichiers à importer |
+| `pc/sauvegardes-rm/` | fichiers de page d'origine, gardés 30 jours avant chaque écriture directe |
 | `pc/cadrage.json` | état du cadrage de chaque PDF (fait, aucun, envoyé, échec) |
 | `pc/tablette.conf`, `pc/.ssh_config` | adresse Wi-Fi, configuration SSH générée |
 | `pc/carnets-lies.json`, `pc/crayons.json` | liens entre documents, palette |

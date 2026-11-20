@@ -211,3 +211,14 @@ entrée (`… & P=$!; read _; kill $P`), sinon elles s'accumulent.
   `hasExportedColor`, `boundingRect`). `cloneSelectedItems` renvoie une
   `QList<std::shared_ptr<SceneItem>>` opaque (ni longueur ni contenu lisibles). Pistes restantes : une extension
   xovi native (C++), ou écrire le fichier `.rm` d'une page quand le document est fermé.
+- **Écrire une page document fermé (vérifié)** : ajouter des blocs « trait » à la FIN du fichier (`SceneLineItemBlock`,
+  parent = calque `0:11`, identifiant auteur 1 : compteur au-delà du plus grand du fichier, `left_id` = dernier
+  élément du calque, `right_id` = 0:0) ; la tablette les affiche, les garde, et numérote ses traits suivants à leur
+  suite. Ne pas réécrire le fichier avec rmscene : il change la version des blocs inconnus 14 / 15. Page sans
+  fichier : un fichier minimal (auteurs, migration, infos de page, arbre, racine 0:1, calque 0:11 « Layer 1 »,
+  rattachement 0:13) est accepté. Un PDF jamais ouvert n'a pas encore d'identifiants de pages (`.content` vide).
+  Couleur libre : `PenColor.HIGHLIGHT` (9) + `color_rgba`. Surligneur : bande = 30 × épaisseur, largeur des points
+  = 4 × bande.
+- **Document ouvert ou fermé** : pour un PDF / EPUB, le journal de xochitl écrit « worker on <uid> now running »
+  à l'ouverture et « … now exiting » à la fermeture (rien pour un carnet). Le journal est gardé en mémoire et
+  court : sans aucune trace, ne pas conclure.

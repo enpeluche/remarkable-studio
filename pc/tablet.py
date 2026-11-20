@@ -189,3 +189,19 @@ def formes_run(cmd, timeout=45):
         if r.get("id") == cid:
             return bool(r.get("ok")), r.get("message", "")
     return False, "pas de réponse de la tablette (aucun document ouvert ?)"
+
+
+def doc_is_open(uid):
+    """PDF / EPUB ouvert sur la tablette ? D'après le journal de xochitl : le « travailleur » du document écrit
+    « worker on <uid> now running » à l'ouverture et « … now exiting » à la fermeture (pas de travailleur pour
+    un carnet). True / False d'après la dernière de ces lignes ; None si aucune trace (journal limité, gardé
+    en mémoire : une ouverture ancienne a pu en sortir) ou tablette injoignable."""
+    r = ssh(f"journalctl -u xochitl -b --no-pager -o cat | grep 'worker on {uid} now' | tail -n 1", timeout=20)
+    if r.returncode != 0:
+        return None
+    last = r.stdout.decode()
+    if "now running" in last:
+        return True
+    if "now exiting" in last:
+        return False
+    return None

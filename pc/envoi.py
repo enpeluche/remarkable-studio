@@ -15,7 +15,9 @@ Types :
 
 États : attente -> fait | abandon (raison : document ou page supprimés, fichier refusé…).
 """
+import io
 import json
+import subprocess
 import threading
 import time
 import urllib.parse
@@ -23,10 +25,13 @@ import uuid
 from pathlib import Path
 
 import annots
+import rmedit
 import tablet
+from live import RM_DIR, RM_HOST, SSH_OPTS, ssh
 
 HERE = Path(__file__).resolve().parent
 FILE = HERE / "envoi.json"
+BACKUPS = HERE / "sauvegardes-rm"      # fichiers de page d'origine, gardés avant toute écriture directe
 FILES = HERE / "envoi"
 LIVE_DELAY = 60          # une demande « directe » plus ancienne devient un rattrapage (pas de changement de page)
 KEEP_DONE = 7 * 86400    # entrées terminées gardées une semaine (historique), puis oubliées
@@ -40,6 +45,10 @@ class Envoi:
         self.wake = threading.Event()
         self.entries = self._load()
         FILES.mkdir(exist_ok=True)
+        # sauvegardes des pages d'avant écriture directe : gardées 30 jours
+        for f in BACKUPS.glob("*/*.rm") if BACKUPS.exists() else []:
+            if time.time() - f.stat().st_mtime > 30 * 86400:
+                f.unlink(missing_ok=True)
         threading.Thread(target=self._loop, daemon=True).start()
 
     # ------------------------------------------------------------ stockage
@@ -151,7 +160,7 @@ class Envoi:
         st = self.current.get()
         reachable = not st.get("error")
         for e in sorted(todo, key=lambda e: e["cree"]):
-            if self.get(e["id"])["etat"] != "attente":
+            if self.get(e["id"])["etat"] != "attente" or time.time() < e.get("prochain", 0):
                 continue
             try:
                 if e["type"] == "marks":
@@ -185,7 +194,11 @@ class Envoi:
         self._update(e, etat="abandon", fin=time.time(), erreur=why, en_attente_de=None)
 
     def _retry(self, e, why):
-        self._update(e, essais=e.get("essais", 0) + 1, erreur=why)
+        """Échec passager : nouvel essai plus tard (attente croissante, 5 s à 5 min) ; abandon après 20 essais."""
+        n = e.get("essais", 0) + 1
+        if n > 20:
+            return self._abandon(e, why)
+        self._update(e, essais=n, erreur=why, prochain=time.time() + min(300, 5 * 2 ** min(n, 6)))
 
     def _note(self, e, waiting):
         """Rien à faire pour l'instant : on note ce qu'on attend (affiché sur le PC)."""
@@ -221,6 +234,12 @@ class Envoi:
                 return self._abandon(e, "page supprimée")
         if not reachable:
             return self._note(e, "tablette non connectée")
+        pid = item["pages"][n]["id"]
+        # document FERMÉ sur la tablette : écriture directe dans le fichier de la page (sans l'ouvrir)
+        if pid and self._closed(e["doc"], item, st):
+            return self._write_direct(e, pid)
+        if e.get("ecrit_ids"):
+            return self._note(e, "la fermeture du document sur la tablette (vérification de l'écriture)")
         shown = st.get("doc") == e["doc"] and st.get("page") == n
         live = time.time() - e["cree"] < LIVE_DELAY and e.get("direct")
         if not shown:
@@ -242,7 +261,6 @@ class Envoi:
             time.sleep(1.5)                              # bandeau de titre, rendu : affichage stabilisé
         if e.get("essais", 0) and e.get("kind") == "highlight" and self._already_there(e, n):
             return self._done(e, "déjà présent sur la tablette")
-        pid = item["pages"][n]["id"]
         if e.get("kind") == "highlight" and e.get("rects"):
             # d'abord le surlignage accroché au texte, tracé sur place (rapide, vrai surlignage de la tablette) ;
             # ligne hors de l'écran ou sous l'interface : méthode du gabarit (droites copiées), qui marche partout
@@ -262,6 +280,90 @@ class Envoi:
             self._retry(e, msg)
             if e.get("essais", 0) >= 5:
                 self._abandon(e, msg)
+
+    # ------------------------------------------------------------ écriture directe (document fermé)
+    def _lines(self, e):
+        argb = int(e["pen"].get("argb") or 0xFF000000)
+        rgba = ((argb >> 16) & 255, (argb >> 8) & 255, argb & 255, 255)
+        out = []
+        for x0, y0, x1, y1, w in e["segs"]:
+            if e.get("kind") == "highlight":       # bande : largeur = 30 x épaisseur (mesuré sur la tablette)
+                out.append({"tool": rmedit.si.Pen.HIGHLIGHTER_2, "color": rmedit.si.PenColor.HIGHLIGHT, "rgba": rgba,
+                            "thickness": w / 30, "points": [(x0, y0, 4 * w), (x1, y1, 4 * w)]})
+            else:
+                out.append({"tool": rmedit.si.Pen.FINELINER_2, "color": rmedit.si.PenColor.HIGHLIGHT, "rgba": rgba,
+                            "thickness": 2.0, "points": [(x0, y0, 16), (x1, y1, 16)]})
+        return out
+
+    def _write_direct(self, e, pid):
+        path = f"{RM_DIR}/{e['doc']}/{pid}.rm"
+        r = ssh(f"stat -c %s-%Y {path} 2>/dev/null || echo absent; cat {path} 2>/dev/null; true", timeout=30)
+        if r.returncode != 0:
+            return self._retry(e, "lecture du fichier de la page impossible")
+        head, _, raw = r.stdout.partition(b"\n")
+        sig = head.decode().strip()
+        # déjà écrit (essai précédent dont la confirmation a manqué) : ne pas doubler
+        if e.get("ecrit_ids") and raw and self._has_ids(raw, e["ecrit_ids"]):
+            return self._done(e, "écrit dans la page (document fermé)")
+        if sig == "absent":
+            au = self._device_author(e["doc"])
+            if not au:
+                return self._retry(e, "auteur de la tablette inconnu")
+            raw = rmedit.new_page(au)
+        else:
+            d = BACKUPS / e["doc"]
+            d.mkdir(parents=True, exist_ok=True)
+            (d / f"{pid}-{int(time.time())}.rm").write_bytes(raw)
+        try:
+            out, added = rmedit.add_lines(raw, self._lines(e))
+        except Exception as ex:
+            return self._abandon(e, f"fichier de page inattendu ({ex})")
+        cond = f'[ "$(stat -c %s-%Y {path} 2>/dev/null || echo absent)" = "{sig}" ] || exit 9; '
+        w = subprocess.run(["ssh", *SSH_OPTS, RM_HOST, cond + f"mkdir -p {RM_DIR}/{e['doc']} && cat > {path}.tmp && mv {path}.tmp {path}"],
+                           input=out, capture_output=True, timeout=30)
+        if w.returncode == 9:
+            return self._retry(e, "page modifiée pendant l'écriture : nouvel essai")
+        if w.returncode != 0:
+            return self._retry(e, "écriture impossible")
+        ids = [[i.part1, i.part2] for i in added]
+        self._update(e, ecrit_ids=ids)
+        self.current.t = 0
+        if self._closed(e["doc"], self.lib.snapshot().get(e["doc"]), self.current.get()):  # toujours fermé
+            chk = ssh(f"cat {path}", timeout=30)
+            if chk.returncode == 0 and self._has_ids(chk.stdout, ids):
+                return self._done(e, "écrit dans la page (document fermé)")
+        self._note(e, "la fermeture du document sur la tablette (vérification de l'écriture)")
+
+    @staticmethod
+    def _closed(doc, item, st):
+        """Fermé avec certitude : PDF / EPUB (seuls à laisser une trace d'ouverture dans le journal) dont la
+        dernière trace est une fermeture ; sans aucune trace, seulement s'il n'est pas le dernier affiché.
+        Ouvert, la tablette réécrirait la page depuis sa mémoire, sans nos traits."""
+        if not item or item.get("type") not in ("pdf", "epub"):
+            return False
+        state = tablet.doc_is_open(doc)
+        if state is None:
+            return st.get("doc") != doc and not st.get("error")
+        return state is False
+
+    @staticmethod
+    def _has_ids(raw, ids):
+        try:
+            tree = rmedit.read_tree(io.BytesIO(raw))
+            present = {(k.part1, k.part2) for g in tree.root.children.values() if isinstance(g, rmedit.si.Group)
+                       for k in g.children.keys()}
+            return all(tuple(i) in present for i in ids)
+        except Exception:
+            return False
+
+    def _device_author(self, doc):
+        """UUID d'auteur de la tablette, lu dans un fichier de page existant (du document, sinon d'un autre)."""
+        r = ssh(f"f=$(ls {RM_DIR}/{doc}/*.rm 2>/dev/null | sed -n 1p); [ -n \"$f\" ] || f=$(ls {RM_DIR}/*/*.rm | sed -n 1p); cat \"$f\"",
+                timeout=30)
+        try:
+            return rmedit.author_of(r.stdout) if r.returncode == 0 else None
+        except Exception:
+            return None
 
     def _already_there(self, e, n):
         """Après un essai sans réponse, la marque a peut-être été tracée quand même : la chercher dans la page
